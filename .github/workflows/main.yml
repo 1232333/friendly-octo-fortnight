@@ -49,30 +49,43 @@ jobs:
           test -f CMakePresets.json
           test -f .github/actions/orchestrator-build/action.yml
 
+      
       - name: Fetch Godot dependencies
         shell: bash
         run: |
-          set -euo pipefail
+          set -euxo pipefail
+
           mkdir -p extern
 
-          echo "Fetching Godot 4.7..."
+          echo "Preparing Godot source..."
+          rm -rf extern/godot-engine
           git clone --depth 1 --branch 4.7 \
             https://github.com/godotengine/godot.git \
             extern/godot-engine
 
-          echo "Fetching godot-cpp..."
-          git clone --depth 1 --branch master \
+          echo "Preparing godot-cpp source..."
+          rm -rf extern/godot-cpp
+
+          echo "Checking official repository..."
+          git ls-remote https://github.com/godotengine/godot-cpp.git HEAD
+
+          echo "Cloning godot-cpp master..."
+          git clone --depth 1 --single-branch --branch master \
             https://github.com/godotengine/godot-cpp.git \
             extern/godot-cpp
 
+          echo "Checking downloaded source..."
           test -f extern/godot-engine/CMakeLists.txt
           test -f extern/godot-cpp/CMakeLists.txt
+          test -f extern/godot-cpp/SConstruct
 
-          echo "Godot:"
+          echo "Godot source:"
           git -C extern/godot-engine log -1 --oneline
 
-          echo "godot-cpp:"
+          echo "godot-cpp source:"
           git -C extern/godot-cpp log -1 --oneline
+
+          echo "Dependencies downloaded successfully."
 
       - name: Install native build tools
         shell: bash
@@ -114,6 +127,18 @@ jobs:
           fi
 
           test -f "$NDK_PATH/build/cmake/android.toolchain.cmake"
+          
+
+      - name: Configure Godot API version
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          grep -n "GODOTCPP_API_VERSION" CMakeLists.txt
+
+          cmake -S . -B build/android-arm64-editor \
+            -G Ninja \
+            -D GODOTCPP_API_VERSION=4.7
 
       - name: Build Android ARM64 Editor Extension
         uses: ./.github/actions/orchestrator-build
