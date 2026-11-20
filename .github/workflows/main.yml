@@ -1,5 +1,5 @@
 
-name: Build SkillTreeStudio Android ARM64
+name: Build Android ARM64 Editor
 
 on:
   workflow_dispatch:
@@ -15,20 +15,16 @@ jobs:
     timeout-minutes: 120
 
     steps:
-      # 1. 获取 GitHub 仓库
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
-      # 2. 解压 Orchestrator 构建包
-      - name: Extract Orchestrator source
+      - name: Extract uploaded source ZIP
         shell: bash
         run: |
           set -euo pipefail
 
           ZIP_FILE="SkillTreeStudio_Orchestrator_Android_ARM64_BuildKit.zip"
-          TEMP_SOURCE="$RUNNER_TEMP/orchestrator-source"
+          TEMP_SOURCE="$RUNNER_TEMP/skill-tree-source"
 
           if [ ! -f "$ZIP_FILE" ]; then
             echo "::error::找不到构建包：$ZIP_FILE"
@@ -42,202 +38,135 @@ jobs:
           SOURCE_ROOT="$TEMP_SOURCE/SkillTreeStudio_Orchestrator_Android_ARM64_BuildKit"
 
           if [ ! -f "$SOURCE_ROOT/CMakeLists.txt" ]; then
-            echo "::error::没有找到 Orchestrator 的 CMakeLists.txt"
+            echo "::error::没有找到 CMakeLists.txt"
             find "$TEMP_SOURCE" -name CMakeLists.txt -print
             exit 1
           fi
 
           rsync -a "$SOURCE_ROOT/" "$GITHUB_WORKSPACE/"
 
-          echo "检查 Orchestrator 文件..."
-
           test -f CMakeLists.txt
           test -f CMakePresets.json
-          test -f .gitmodules
-          test -f cmake/godot-dev-configuration.cmake
           test -f .github/actions/orchestrator-build/action.yml
-          test -f project/addons/orchestrator/orchestrator.gdextension
+          test -f src/script/script_rpc_callable.h
 
-          echo "源码准备完成。"
-
-      # 3. 获取 Godot 4.7 引擎源码
-      - name: Fetch Godot Engine 4.7
-        uses: actions/checkout@v4
-        with:
-          repository: godotengine/godot
-          ref: 4.7
-          path: extern/godot-engine
-          fetch-depth: 1
-
-      # 4. 获取 godot-cpp
-      - name: Fetch godot-cpp
-        uses: actions/checkout@v4
-        with:
-          repository: godotengine/godot-cpp
-          ref: master
-          path: extern/godot-cpp
-          fetch-depth: 1
-
-      # 5. 验证两个依赖目录
-      - name: Verify Godot dependencies
+      - name: Fetch Godot dependencies
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "检查 Godot 引擎核心目录..."
+          mkdir -p extern
 
-          if [ ! -d extern/godot-engine/core ]; then
-            echo "::error::Godot 引擎 core 目录不存在"
-            find extern/godot-engine -maxdepth 2 -type d | head -80
-            exit 1
-          fi
+          echo "Fetching Godot Engine 4.7..."
+          git clone --depth 1 --branch 4.7 \
+            https://github.com/godotengine/godot.git \
+            extern/godot-engine
 
-          echo "检查 godot-cpp 源码目录..."
-
-          if [ ! -d extern/godot-cpp/src ]; then
-            echo "::error::godot-cpp src 目录不存在"
-            find extern/godot-cpp -maxdepth 2 -type d | head -80
-            exit 1
-          fi
+          echo "Fetching godot-cpp..."
+          git clone --depth 1 --branch master \
+            https://github.com/godotengine/godot-cpp.git \
+            extern/godot-cpp
 
           test -f extern/godot-engine/SConstruct
           test -f extern/godot-cpp/SConstruct
 
-          echo "Godot 引擎版本："
+          echo "Godot:"
           git -C extern/godot-engine log -1 --oneline
 
-          echo "godot-cpp 版本："
+          echo "godot-cpp:"
           git -C extern/godot-cpp log -1 --oneline
 
-          echo "依赖检查通过。"
-
-      # 6. 安装编译工具
-      - name: Install build tools
+      - name: Install native build tools
         shell: bash
         run: |
           set -euo pipefail
-
           sudo apt-get update
+          sudo apt-get install -y clang ninja-build ccache rsync unzip file
 
-          sudo apt-get install -y \
-            clang \
-            ninja-build \
-            ccache \
-            rsync \
-            unzip \
-            file \
-            jq
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-          cmake --version
-          clang++ --version
-          ninja --version
+      - name: Install SCons
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install scons==4.10.1
+          scons --version
 
-      # 7. 安装 Android NDK
       - name: Install Android NDK
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r23c
           link-to-sdk: true
 
-      # 8. 设置 NDK 环境变量
-      - name: Configure Android NDK
+      - name: Verify Android toolchain
         shell: bash
         run: |
           set -euo pipefail
 
-          NDK_PATH="${ANDROID_NDK:-}"
+          NDK_PATH="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-${ANDROID_NDK:-}}}"
 
           if [ -z "$NDK_PATH" ]; then
-            NDK_PATH="${ANDROID_NDK_HOME:-}"
-          fi
-
-          if [ -z "$NDK_PATH" ]; then
-            NDK_PATH="${ANDROID_NDK_ROOT:-}"
-          fi
-
-          if [ -z "$NDK_PATH" ]; then
-            echo "::error::找不到 Android NDK"
+            echo "::error::Android NDK 环境变量未设置"
             env | grep -i ndk || true
             exit 1
           fi
 
-          TOOLCHAIN="$NDK_PATH/build/cmake/android.toolchain.cmake"
+          test -f "$NDK_PATH/build/cmake/android.toolchain.cmake"
 
-          if [ ! -f "$TOOLCHAIN" ]; then
-            echo "::error::Android NDK 工具链不存在：$TOOLCHAIN"
-            exit 1
-          fi
+          echo "NDK: $NDK_PATH"
 
-          echo "ANDROID_NDK=$NDK_PATH" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
-
-          echo "NDK 路径：$NDK_PATH"
-          echo "NDK 工具链检查通过。"
-
-      # 9. 检查 CMake 构建预设
-      - name: Verify Android ARM64 preset
+      # 修复本次 99% 编译失败的 StringName 类型错误
+      - name: Patch StringName include
         shell: bash
         run: |
           set -euo pipefail
 
-          cmake --list-presets
+          HEADER="src/script/script_rpc_callable.h"
+          INCLUDE="#include <godot_cpp/variant/string_name.hpp>"
 
-          grep -n -A12 '"name": "android-arm64-editor"' \
-            CMakePresets.json
+          if [ ! -f "$HEADER" ]; then
+            echo "::error::找不到 $HEADER"
+            exit 1
+          fi
 
-          echo "检查 Orchestrator 构建动作..."
-          test -f .github/actions/orchestrator-build/action.yml
+          if ! grep -Fq "$INCLUDE" "$HEADER"; then
+            sed -i '/#include <godot_cpp\/variant\/callable_custom.hpp>/a #include <godot_cpp/variant/string_name.hpp>' "$HEADER"
+          fi
 
-      # 10. 编译 Orchestrator
-      - name: Build Android ARM64 Editor
+          echo "检查头文件："
+          grep -n 'godot_cpp/variant/.*hpp' "$HEADER"
+
+      - name: Build Android ARM64 Editor Extension
         uses: ./.github/actions/orchestrator-build
         with:
           artifact-name: android-arm64-editor
           cache-name: android-arm64-editor
           preset-name: android-arm64-editor
 
-      # 11. 检查最终生成的动态库
-      - name: Verify Android ARM64 library
+      - name: Verify compiled Android library
         shell: bash
         run: |
           set -euo pipefail
 
           LIBRARY="project/addons/orchestrator/liborchestrator.android.64.editor.so"
 
-          echo "检查编译产物..."
-
           if [ ! -f "$LIBRARY" ]; then
             echo "::error::没有找到 Android ARM64 Editor 动态库"
-
-            echo "当前生成的 SO 文件："
             find project -type f -name '*.so' -print || true
-
-            echo "构建目录："
-            find build -maxdepth 4 -type f 2>/dev/null | head -100 || true
-
             exit 1
           fi
 
-          echo "动态库生成成功："
+          echo "编译成功："
           ls -lh "$LIBRARY"
           file "$LIBRARY"
 
-      # 12. 上传 Android ARM64 动态库
       - name: Upload Android ARM64 Editor library
         uses: actions/upload-artifact@v4
         with:
           name: Orchestrator-Android-ARM64-Editor-Library
           path: project/addons/orchestrator/liborchestrator.android.64.editor.so
-          if-no-files-found: error
-          retention-days: 14
-
-      # 13. 上传完整插件
-      - name: Upload complete Orchestrator plugin
-        uses: actions/upload-artifact@v4
-        with:
-          name: SkillTreeStudio-Orchestrator-Android-ARM64-Plugin
-          path: |
-            project/addons/orchestrator/
-            !project/addons/orchestrator/*debug*
           if-no-files-found: error
           retention-days: 14
