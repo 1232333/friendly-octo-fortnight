@@ -80,7 +80,7 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential clang cmake ninja-build ccache git unzip fonts-noto-cjk
+          sudo apt-get install -y build-essential clang cmake ninja-build ccache git unzip gettext fonts-noto-cjk
 
       - name: Set up Python and SCons
         uses: actions/setup-python@v5
@@ -156,6 +156,7 @@ jobs:
             --regular /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc \
             --bold /usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc \
             --license /usr/share/doc/fonts-noto-cjk/copyright
+          msgfmt --check --check-format -o /dev/null "$PROJECT_DIR/project/addons/orchestrator/locale/zh_CN.po"
           echo "Post-build translation and font assets:"
           find "$PROJECT_DIR/project/addons/orchestrator/locale" "$PROJECT_DIR/project/addons/orchestrator/fonts" -maxdepth 1 -type f -printf '%P %s bytes\n' | sort
 
