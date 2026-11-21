@@ -59,6 +59,7 @@ jobs:
           set -euo pipefail
           python tools/localization/scan_english.py --root "$SOURCE_ROOT" --out "$RUNNER_TEMP/localization-report"
           sed -n '1,100p' "$RUNNER_TEMP/localization-report/scan_summary.md"
+          cp "$RUNNER_TEMP/translation-apply-report.json" "$RUNNER_TEMP/localization-report/"
 
       - name: Upload Chinese localization audit
         uses: actions/upload-artifact@v4
