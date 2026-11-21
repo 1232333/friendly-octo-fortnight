@@ -31,9 +31,9 @@ def make_font(source: Path, output: Path) -> None:
 
 def replace(path: Path, old: str, new: str, expected: int = 1) -> None:
     text = path.read_text(encoding="utf-8")
-    count = text.count(old)
-    if count == 0 and new in text:
+    if new in text:
         return
+    count = text.count(old)
     if count != expected:
         raise RuntimeError(f"{path}: expected {expected} matches, found {count}: {old!r}")
     path.write_text(text.replace(old, new), encoding="utf-8", newline="\n")
