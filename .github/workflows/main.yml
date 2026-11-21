@@ -133,6 +133,43 @@ jobs:
           fi
           ls -lh "$LIBRARY"
 
+
+      - name: Package complete Orchestrator Android plugin
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ADDON_DIR="project/addons/orchestrator"
+          if [ ! -d "$ADDON_DIR" ]; then
+            echo "::error::Orchestrator addon directory is missing: $ADDON_DIR"
+            exit 1
+          fi
+          if [ ! -f "$ADDON_DIR/plugin.cfg" ]; then
+            echo "::error::plugin.cfg is missing from the addon directory."
+            exit 1
+          fi
+          if [ ! -f "$ADDON_DIR/liborchestrator.android.64.editor.so" ]; then
+            echo "::error::Android ARM64 editor library is missing from the addon directory."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/orchestrator-plugin-package"
+          cp -a "$ADDON_DIR" "$RUNNER_TEMP/orchestrator-plugin-package/orchestrator"
+          (
+            cd "$RUNNER_TEMP/orchestrator-plugin-package"
+            zip -qr "$RUNNER_TEMP/Orchestrator-Android-ARM64-Editor-Plugin.zip" orchestrator
+          )
+          echo "Packaged addon files:"
+          find "$RUNNER_TEMP/orchestrator-plugin-package/orchestrator" -type f | sort
+          ls -lh "$RUNNER_TEMP/Orchestrator-Android-ARM64-Editor-Plugin.zip"
+
+      - name: Upload complete Orchestrator Android plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orchestrator-Android-ARM64-Editor-Plugin
+          path: ${{ runner.temp }}/Orchestrator-Android-ARM64-Editor-Plugin.zip
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload Android ARM64 Editor Library
         uses: actions/upload-artifact@v4
         with:
