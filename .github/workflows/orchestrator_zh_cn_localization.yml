@@ -57,3 +57,11 @@ jobs:
           path: ${{ runner.temp }}/localization-report/
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload original source archive for localization review
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orchestrator-2.5-Original-Source-Archive
+          path: ${{ github.workspace }}/Orchestrator_2.5_原工作流兼容版_Android_ARM64_汉化源码.zip
+          if-no-files-found: error
+          retention-days: 7
