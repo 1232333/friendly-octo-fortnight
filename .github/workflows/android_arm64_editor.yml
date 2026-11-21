@@ -2,6 +2,11 @@ name: Android ARM64 Editor Build
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - actions-trigger
+    paths:
+      - ".github/dispatch/build.txt"
 
 permissions:
   contents: read
@@ -132,7 +137,6 @@ jobs:
             exit 1
           fi
           ls -lh "$LIBRARY"
-
 
       - name: Package complete Orchestrator Android plugin
         working-directory: ${{ env.PROJECT_DIR }}
