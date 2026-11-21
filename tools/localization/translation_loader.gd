@@ -4,7 +4,10 @@ extends Node
 const DOMAIN: StringName = &"addons/orchestrator"
 const ROOT_META: StringName = &"orchestrator_translation_root"
 const TRANSLATION_PATH := "res://addons/orchestrator/locale/zh_CN.po"
-const FONT_PATH := "res://addons/orchestrator/fonts/NotoSansSC-Regular.otf"
+const REGULAR_FONT_PATH := "res://addons/orchestrator/fonts/NotoSansSC-Regular.otf"
+const BOLD_FONT_PATH := "res://addons/orchestrator/fonts/NotoSansSC-Bold.otf"
+
+var _font_cache: Dictionary = {}
 
 func _enter_tree() -> void:
     call_deferred("_install_translation")
@@ -26,7 +29,7 @@ func _install_translation() -> void:
 
     root.set_translation_domain(DOMAIN)
     root.set_auto_translate_mode(Node.AUTO_TRANSLATE_MODE_ALWAYS)
-    _apply_font(root)
+    _install_font_fallbacks(root)
     root.propagate_notification(Node.NOTIFICATION_TRANSLATION_CHANGED)
 
 func _find_translation_root(node: Node) -> Node:
@@ -38,23 +41,42 @@ func _find_translation_root(node: Node) -> Node:
             return found
     return null
 
-func _apply_font(node: Node) -> void:
-    var font := ResourceLoader.load(FONT_PATH) as Font
-    if font == null:
-        push_warning("Orchestrator Chinese UI font could not be loaded.")
+func _install_font_fallbacks(node: Node) -> void:
+    var regular_font := ResourceLoader.load(REGULAR_FONT_PATH) as Font
+    var bold_font := ResourceLoader.load(BOLD_FONT_PATH) as Font
+    if regular_font == null:
+        push_warning("Orchestrator Chinese regular fallback font could not be loaded.")
         return
-    if node is Control:
-        var root_control := node as Control
-        var inherited_theme := root_control.get_theme()
-        if inherited_theme != null:
-            var localized_theme := inherited_theme.duplicate() as Theme
-            localized_theme.set_default_font(font)
-            root_control.theme = localized_theme
-    _apply_font_recursive(node, font)
 
-func _apply_font_recursive(node: Node, font: Font) -> void:
+    _install_font_fallbacks_recursive(node, regular_font, bold_font)
+
+func _install_font_fallbacks_recursive(node: Node, regular_font: Font, bold_font: Font) -> void:
     if node is Control:
         var control := node as Control
-        control.add_theme_font_override("font", font)
+        var original_font := control.get_theme_font("font")
+        if original_font is FontFile:
+            var fallback_font := regular_font
+            if bold_font != null and (original_font as FontFile).font_weight >= 600:
+                fallback_font = bold_font
+            var localized_font := _font_with_fallback(original_font as FontFile, fallback_font)
+            if localized_font != null:
+                control.add_theme_font_override("font", localized_font)
+
     for child in node.get_children():
-        _apply_font_recursive(child, font)
+        _install_font_fallbacks_recursive(child, regular_font, bold_font)
+
+func _font_with_fallback(original_font: FontFile, fallback_font: Font) -> FontFile:
+    var cache_key := str(original_font.get_instance_id()) + ":" + str(fallback_font.get_instance_id())
+    if _font_cache.has(cache_key):
+        return _font_cache[cache_key] as FontFile
+
+    var localized_font := original_font.duplicate() as FontFile
+    if localized_font == null:
+        return null
+
+    var fallbacks := localized_font.fallbacks
+    if not fallbacks.has(fallback_font):
+        fallbacks.append(fallback_font)
+    localized_font.fallbacks = fallbacks
+    _font_cache[cache_key] = localized_font
+    return localized_font
