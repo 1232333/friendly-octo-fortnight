@@ -2,6 +2,11 @@ name: Android ARM64 Editor Build
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - actions-trigger
+    paths:
+      - ".github/dispatch/build.txt"
 
 permissions:
   contents: read
@@ -30,7 +35,7 @@ jobs:
 
           ZIP_FILE=""
           while IFS= read -r -d '' candidate; do
-            if unzip -Z1 "$candidate" | grep -Eq '(^|/)CMakeLists\.txt$'; then
+            if unzip -Z1 "$candidate" | grep -Eq '(^|/)CMakeLists\\.txt$'; then
               ZIP_FILE="$candidate"
               break
             fi
@@ -46,7 +51,7 @@ jobs:
           echo "Using source archive: $(basename "$ZIP_FILE")"
           unzip -q "$ZIP_FILE" -d "$EXTRACT_DIR"
 
-          CMAKE_FILE="$(find "$EXTRACT_DIR" -name CMakeLists.txt \
+          CMAKE_FILE="$(find "$EXTRACT_DIR" -name CMakeLists.txt \\
             -not -path '*/extern/*' -print -quit)"
           if [ -z "$CMAKE_FILE" ]; then
             echo "::error::The ZIP was extracted, but no project CMakeLists.txt was found."
@@ -93,13 +98,13 @@ jobs:
 
           if [ ! -f extern/godot-engine/CMakeLists.txt ]; then
             rm -rf extern/godot-engine
-            git clone --depth 1 --branch master \
+            git clone --depth 1 --branch master \\
               https://github.com/godotengine/godot.git extern/godot-engine
           fi
 
           if [ ! -f extern/godot-cpp/CMakeLists.txt ]; then
             rm -rf extern/godot-cpp
-            git clone --depth 1 --branch master \
+            git clone --depth 1 --branch master \\
               https://github.com/godotengine/godot-cpp.git extern/godot-cpp
           fi
 
@@ -132,7 +137,6 @@ jobs:
             exit 1
           fi
           ls -lh "$LIBRARY"
-
 
       - name: Package complete Orchestrator Android plugin
         working-directory: ${{ env.PROJECT_DIR }}
