@@ -1,2 +1,3 @@
-request=package-diagnostic-shell-fix
-purpose=package-complete-orchestrator-android-arm64-editor-plugin
+request=android-arm64-editor-with-zh-cn-localization
+locale=zh_CN
+purpose=compile-translated-orchestrator-source
