@@ -16,11 +16,13 @@ def make_font(source: Path, output: Path) -> None:
         "--recommended-glyphs",
     ], check=True)
 
-def replace(path: Path, old: str, new: str, expected: int = 1) -> None:
+def replace(path: Path, old: str, new: str, expected: int = 1, marker: str = "") -> None:
     text = path.read_text(encoding="utf-8")
-    if new in text:
+    if marker and marker in text:
         return
     count = text.count(old)
+    if count == 0 and new in text:
+        return
     if count != expected:
         raise RuntimeError(f"{path}: expected {expected} matches, found {count}: {old!r}")
     path.write_text(text.replace(old, new), encoding="utf-8", newline="\n")
@@ -48,7 +50,8 @@ def main() -> None:
         "    Ref<Font> get_editor_font(const String& p_font_name);\n",
         "    Ref<Font> get_editor_font(const String& p_font_name);\n\n"
         "    /// Get the bundled Simplified Chinese UI font, with editor-font fallback.\n"
-        "    Ref<Font> get_orchestrator_font(bool p_bold = false);\n")
+        "    Ref<Font> get_orchestrator_font(bool p_bold = false);\n",
+        marker="get_orchestrator_font(bool p_bold = false)")
     replace(root / "src/common/scene_utils.cpp",
         "    Ref<Font> get_editor_font(const String& p_font_name) {\n"
         "        return EI->get_editor_main_screen()->get_theme_font(p_font_name, \"EditorFonts\");\n"
@@ -70,7 +73,8 @@ def main() -> None:
         "            return font;\n"
         "        }\n"
         "        return get_editor_font(p_bold ? \"bold\" : \"main\");\n"
-        "    }\n")
+        "    }\n",
+        marker="Ref<Font> get_orchestrator_font(bool p_bold)")
     replace(root / "src/editor/theme/theme_builder.cpp",
         "    const float base_margin = 4 * EDSCALE;\n",
         "    // Use the bundled Simplified Chinese font throughout Orchestrator controls.\n"
