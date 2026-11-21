@@ -35,7 +35,7 @@ jobs:
 
           ZIP_FILE=""
           while IFS= read -r -d '' candidate; do
-            if unzip -Z1 "$candidate" | grep -Eq '(^|/)CMakeLists\\.txt$'; then
+            if unzip -Z1 "$candidate" | grep -Eq '(^|/)CMakeLists\.txt$'; then
               ZIP_FILE="$candidate"
               break
             fi
