@@ -1,5 +1,5 @@
-request=android-arm64-editor-post-build-zh-cn-localization
+request=android-arm64-editor-post-build-zh-cn-localization-font-fallback
 locale=zh_CN
 translation=runtime-po-domain
-font=post-build-noto-sans-sc
+font=post-build-noto-sans-sc-fallback
 source_translation=disabled
