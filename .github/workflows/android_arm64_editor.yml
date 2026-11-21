@@ -1,0 +1,142 @@
+name: Android ARM64 Editor Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-arm64-editor-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout build kit
+        uses: actions/checkout@v4
+
+      - name: Extract Orchestrator source ZIP
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          EXTRACT_DIR="$RUNNER_TEMP/orchestrator-source"
+          mkdir -p "$EXTRACT_DIR"
+
+          ZIP_FILE=""
+          while IFS= read -r -d '' candidate; do
+            if unzip -Z1 "$candidate" | grep -Eq '(^|/)CMakeLists\.txt$'; then
+              ZIP_FILE="$candidate"
+              break
+            fi
+          done < <(find "$GITHUB_WORKSPACE" -maxdepth 2 -type f -iname '*.zip' -print0)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "::error::No ZIP archive containing CMakeLists.txt was found in the repository."
+            echo "Repository files:"
+            find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -print
+            exit 1
+          fi
+
+          echo "Using source archive: $(basename "$ZIP_FILE")"
+          unzip -q "$ZIP_FILE" -d "$EXTRACT_DIR"
+
+          CMAKE_FILE="$(find "$EXTRACT_DIR" -name CMakeLists.txt \
+            -not -path '*/extern/*' -print -quit)"
+          if [ -z "$CMAKE_FILE" ]; then
+            echo "::error::The ZIP was extracted, but no project CMakeLists.txt was found."
+            find "$EXTRACT_DIR" -maxdepth 4 -type f -print | head -200
+            exit 1
+          fi
+
+          PROJECT_DIR="$(dirname "$CMAKE_FILE")"
+          if [ ! -f "$PROJECT_DIR/CMakePresets.json" ]; then
+            echo "::error::CMakePresets.json is missing beside CMakeLists.txt: $PROJECT_DIR"
+            ls -la "$PROJECT_DIR"
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Found Orchestrator project at: $PROJECT_DIR"
+          ls -la "$PROJECT_DIR"
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang cmake ninja-build ccache git unzip
+
+      - name: Set up Python and SCons
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install SCons
+        run: python -m pip install --upgrade pip scons==4.10.1
+
+      - name: Set up Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r23c
+          link-to-sdk: true
+
+      - name: Fetch Godot dependencies
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p extern
+
+          if [ ! -f extern/godot-engine/CMakeLists.txt ]; then
+            rm -rf extern/godot-engine
+            git clone --depth 1 --branch master \
+              https://github.com/godotengine/godot.git extern/godot-engine
+          fi
+
+          if [ ! -f extern/godot-cpp/CMakeLists.txt ]; then
+            rm -rf extern/godot-cpp
+            git clone --depth 1 --branch master \
+              https://github.com/godotengine/godot-cpp.git extern/godot-cpp
+          fi
+
+      - name: Configure Android ARM64 Editor
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: cmake --preset android-arm64-editor
+
+      - name: Build Orchestrator
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CACHE_FILE="$(find . -name CMakeCache.txt -not -path '*/extern/*' -print -quit)"
+          if [ -z "$CACHE_FILE" ]; then
+            echo "::error::CMakeCache.txt was not created by CMake configure."
+            exit 1
+          fi
+          BUILD_DIR="$(dirname "$CACHE_FILE")"
+          echo "Building from: $BUILD_DIR"
+          cmake --build "$BUILD_DIR" --target orchestrator -j 4
+
+      - name: Verify Android library
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+          LIBRARY="project/addons/orchestrator/liborchestrator.android.64.editor.so"
+          if [ ! -f "$LIBRARY" ]; then
+            echo "::error::Expected library was not produced: $LIBRARY"
+            find . -name 'liborchestrator*.so' -print
+            exit 1
+          fi
+          ls -lh "$LIBRARY"
+
+      - name: Upload Android ARM64 Editor Library
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orchestrator-Android-ARM64-Editor-Library
+          path: ${{ env.PROJECT_DIR }}/project/addons/orchestrator/liborchestrator.android.64.editor.so
+          if-no-files-found: error
+          retention-days: 7
