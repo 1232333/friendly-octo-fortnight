@@ -182,11 +182,18 @@ jobs:
             echo "::error::Android ARM64 editor library is missing from the addon directory."
             exit 1
           fi
-          mkdir -p "$RUNNER_TEMP/orchestrator-plugin-package"
-          cp -a "$ADDON_DIR" "$RUNNER_TEMP/orchestrator-plugin-package/orchestrator"
+          if [ ! -f "$ADDON_DIR/orchestrator.gdextension" ]; then
+            echo "::error::GDExtension descriptor is missing."
+            exit 1
+          fi
+          grep -F 'android.debug.arm64 = "res://addons/orchestrator/liborchestrator.android.64.editor.so"' "$ADDON_DIR/orchestrator.gdextension"
+          test -s "$ADDON_DIR/fonts/NotoSansSC-Regular.otf"
+          test -s "$ADDON_DIR/fonts/NotoSansSC-Bold.otf"
+          mkdir -p "$RUNNER_TEMP/orchestrator-plugin-package/addons"
+          cp -a "$ADDON_DIR" "$RUNNER_TEMP/orchestrator-plugin-package/addons/orchestrator"
           (
             cd "$RUNNER_TEMP/orchestrator-plugin-package"
-            zip -qr "$RUNNER_TEMP/Orchestrator-Android-ARM64-Editor-Plugin.zip" orchestrator
+            zip -qr "$RUNNER_TEMP/Orchestrator-Android-ARM64-Editor-Plugin.zip" addons
           )
           echo "Packaged addon files:"
           find "$RUNNER_TEMP/orchestrator-plugin-package/orchestrator" -type f | sort
