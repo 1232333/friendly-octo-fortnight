@@ -3,3 +3,5 @@ locale=zh_CN
 purpose=compile-translated-orchestrator-source
 
 request=android-arm64-editor-with-embedded-noto-sans-sc-font
+
+request=android-arm64-editor-addon-root-layout
