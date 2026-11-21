@@ -51,10 +51,10 @@ def main() -> None:
         raise SystemExit(f"Not an Orchestrator source tree: {root}")
 
     fonts = addon / "fonts"
-    if not (fonts / "NotoSansSC-Regular.ttf").is_file():
-        make_font(args.regular, fonts / "NotoSansSC-Regular.ttf")
-    if not (fonts / "NotoSansSC-Bold.ttf").is_file():
-        make_font(args.bold, fonts / "NotoSansSC-Bold.ttf")
+    if not (fonts / "NotoSansSC-Regular.otf").is_file():
+        make_font(args.regular, fonts / "NotoSansSC-Regular.otf")
+    if not (fonts / "NotoSansSC-Bold.otf").is_file():
+        make_font(args.bold, fonts / "NotoSansSC-Bold.otf")
     shutil.copy2(args.license, fonts / "NotoSansCJK-LICENSE.txt")
 
     replace(root / "src/common/scene_utils.h",
@@ -75,8 +75,8 @@ def main() -> None:
         "        Ref<Font>& font = p_bold ? bold_font : regular_font;\n"
         "        if (font.is_null()) {\n"
         "            const String path = p_bold\n"
-        "                ? \"res://addons/orchestrator/fonts/NotoSansSC-Bold.ttf\"\n"
-        "                : \"res://addons/orchestrator/fonts/NotoSansSC-Regular.ttf\";\n"
+        "                ? \"res://addons/orchestrator/fonts/NotoSansSC-Bold.otf\"\n"
+        "                : \"res://addons/orchestrator/fonts/NotoSansSC-Regular.otf\";\n"
         "            font = ResourceLoader::get_singleton()->load(path);\n"
         "        }\n"
         "        if (font.is_valid()) {\n"
@@ -114,7 +114,7 @@ def main() -> None:
         for old, new, count in items:
             replace(root / relative, old, new, count)
 
-    for name in ("NotoSansSC-Regular.ttf", "NotoSansSC-Bold.ttf", "NotoSansCJK-LICENSE.txt"):
+    for name in ("NotoSansSC-Regular.otf", "NotoSansSC-Bold.otf", "NotoSansCJK-LICENSE.txt"):
         asset = fonts / name
         if not asset.is_file() or asset.stat().st_size < 1000:
             raise RuntimeError(f"Missing/invalid font asset: {asset}")
