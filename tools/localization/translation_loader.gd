@@ -43,6 +43,13 @@ func _apply_font(node: Node) -> void:
     if font == null:
         push_warning("Orchestrator Chinese UI font could not be loaded.")
         return
+    if node is Control:
+        var root_control := node as Control
+        var inherited_theme := root_control.get_theme()
+        if inherited_theme != null:
+            var localized_theme := inherited_theme.duplicate() as Theme
+            localized_theme.set_default_font(font)
+            root_control.theme = localized_theme
     _apply_font_recursive(node, font)
 
 func _apply_font_recursive(node: Node, font: Font) -> void:
