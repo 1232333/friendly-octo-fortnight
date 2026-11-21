@@ -44,6 +44,16 @@ jobs:
           echo "SOURCE_ROOT=$(dirname "$CMAKE_FILE")" >> "$GITHUB_ENV"
           echo "Source root: $(dirname "$CMAKE_FILE")"
 
+
+      - name: Apply reviewed zh-CN UI literals in the extracted build tree
+        run: |
+          set -euo pipefail
+          python tools/localization/apply_translations.py \
+            --root "$SOURCE_ROOT" \
+            --translations tools/localization/zh_CN.json \
+            --report "$RUNNER_TEMP/translation-apply-report.json"
+          cat "$RUNNER_TEMP/translation-apply-report.json"
+
       - name: Scan English strings and build zh-CN catalog
         run: |
           set -euo pipefail
