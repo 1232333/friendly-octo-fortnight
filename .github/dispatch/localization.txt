@@ -1,1 +1,3 @@
-request=full-english-string-audit\nlocale=zh_CN\npurpose=build-translation-catalog\n
+request=refined-full-source-english-audit
+locale=zh_CN
+purpose=remove-build-noise-and-identifier-false-positives
