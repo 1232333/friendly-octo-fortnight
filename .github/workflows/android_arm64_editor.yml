@@ -157,7 +157,7 @@ jobs:
             --bold /usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc \
             --license /usr/share/doc/fonts-noto-cjk/copyright
           echo "Post-build translation and font assets:"
-          find "$PROJECT_DIR/project/addons/orchestrator/locale" "$PROJECT_DIR/project/addons/orchestrator/fonts" -maxdepth 1 -type f -printf '%P %s bytes\\n' | sort
+          find "$PROJECT_DIR/project/addons/orchestrator/locale" "$PROJECT_DIR/project/addons/orchestrator/fonts" -maxdepth 1 -type f -printf '%P %s bytes\n' | sort
 
       - name: Package complete Orchestrator Android plugin
         working-directory: ${{ env.PROJECT_DIR }}
@@ -184,6 +184,8 @@ jobs:
           grep -F 'android.debug.arm64 = "res://addons/orchestrator/liborchestrator.android.64.editor.so"' "$ADDON_DIR/orchestrator.gdextension"
           test -s "$ADDON_DIR/fonts/NotoSansSC-Regular.otf"
           test -s "$ADDON_DIR/fonts/NotoSansSC-Bold.otf"
+          test -s "$ADDON_DIR/locale/zh_CN.po"
+          test -s "$ADDON_DIR/locale/translation_loader.gd"
           mkdir -p "$RUNNER_TEMP/orchestrator-plugin-package/addons"
           cp -a "$ADDON_DIR" "$RUNNER_TEMP/orchestrator-plugin-package/addons/orchestrator"
           (
