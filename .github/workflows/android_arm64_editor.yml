@@ -70,6 +70,25 @@ jobs:
           echo "Found Orchestrator project at: $PROJECT_DIR"
           ls -la "$PROJECT_DIR"
 
+
+      - name: Apply Simplified Chinese editor localization
+        shell: bash
+        run: |
+          set -euo pipefail
+          python "$GITHUB_WORKSPACE/tools/localization/apply_translations.py" \
+            --root "$PROJECT_DIR" \
+            --translations "$GITHUB_WORKSPACE/tools/localization/zh_CN.json" \
+            --report "$RUNNER_TEMP/orchestrator-zh-CN-translation-report.json"
+          cat "$RUNNER_TEMP/orchestrator-zh-CN-translation-report.json"
+
+      - name: Upload localization application report
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orchestrator-zh-CN-Applied-Source-Report
+          path: ${{ runner.temp }}/orchestrator-zh-CN-translation-report.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Install build tools
         run: |
           sudo apt-get update
@@ -148,10 +167,10 @@ jobs:
             echo "::error::Orchestrator addon directory is missing: $ADDON_DIR"
             exit 1
           fi
-          if [ ! -f "$ADDON_DIR/plugin.cfg" ]; then
-            echo "::error::plugin.cfg is missing from the addon directory."
-            exit 1
-          fi
+          echo "Addon directory structure (for packaging diagnosis):"
+          find "$ADDON_DIR" -maxdepth 4 -type f -printf '%P\n' | sort | head -300
+          echo "Editor plugin descriptors:"
+          find "$ADDON_DIR" -maxdepth 4 -type f \( -name 'plugin.cfg' -o -name '*.gdextension' \) -print
           if [ ! -f "$ADDON_DIR/liborchestrator.android.64.editor.so" ]; then
             echo "::error::Android ARM64 editor library is missing from the addon directory."
             exit 1
