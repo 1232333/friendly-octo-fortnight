@@ -89,6 +89,11 @@ def main() -> None:
         '    _theme_cache.label_bold_font = SceneUtils::get_editor_font("main_bold_msdf");\n',
         '    _theme_cache.label_font = SceneUtils::get_orchestrator_font();\n'
         '    _theme_cache.label_bold_font = SceneUtils::get_orchestrator_font(true);\n')
+    replace(root / "src/editor/graph/graph_panel.cpp",
+        "    theme.instantiate();\n",
+        "    theme.instantiate();\n"
+        "    theme->set_default_font(_theme_cache.label_font);\n",
+        marker="theme->set_default_font(_theme_cache.label_font);")
     changes = {
         "src/editor/property_selector.cpp": [('SceneUtils::get_editor_font("source")', 'SceneUtils::get_orchestrator_font()', 2)],
         "src/editor/script_editor_view.cpp": [('SceneUtils::get_editor_font("main")', 'SceneUtils::get_orchestrator_font()', 2)],
