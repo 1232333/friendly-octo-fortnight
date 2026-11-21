@@ -1,2 +1,2 @@
-request=package-diagnostic-retry
-purpose=inspect-addon-structure-and-upload-plugin-zip
+request=package-diagnostic-shell-fix
+purpose=package-complete-orchestrator-android-arm64-editor-plugin
