@@ -39,8 +39,8 @@ def main() -> None:
     text = text.replace(anchor, replacement)
     source.write_text(text, encoding="utf-8", newline="\n")
 
-    if any(ord(char) > 127 for char in text):
-        raise SystemExit("Unexpected non-ASCII character found in patched C++ source.")
+    if any(ord(char) > 127 for char in replacement):
+        raise SystemExit("The injected C++ bootstrap must remain ASCII-only.")
     print("Installed ASCII-only runtime localization bootstrap; no translated strings were added to C++.")
 if __name__ == "__main__":
     main()
