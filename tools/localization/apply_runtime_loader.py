@@ -28,7 +28,7 @@ def main() -> None:
         "            // Load optional post-build localization resources without embedding translated text.\n"
         "            const Variant localization_script = ResourceLoader::get_singleton()->load(\n"
         "                \"res://addons/orchestrator/locale/translation_loader.gd\");\n"
-        "            if (localization_script.get_type() == Variant::OBJECT && localization_script.get_validated_object()) {\n"
+        "            if (localization_script.get_type() == Variant::OBJECT) {\n"
         "                Node* localization_loader = memnew(Node);\n"
         "                localization_loader->set_script(localization_script);\n"
         "                add_child(localization_loader);\n"
