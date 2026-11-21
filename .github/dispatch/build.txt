@@ -1,2 +1,2 @@
-request=initial-validation
-purpose=verify-automated-actions-trigger
+request=package-diagnostic-retry
+purpose=inspect-addon-structure-and-upload-plugin-zip
