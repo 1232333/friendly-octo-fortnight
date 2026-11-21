@@ -82,7 +82,8 @@ def main() -> None:
         "    if (ui_font.is_valid()) {\n"
         "        p_theme->set_default_font(ui_font);\n"
         "    }\n\n"
-        "    const float base_margin = 4 * EDSCALE;\n")
+        "    const float base_margin = 4 * EDSCALE;\n",
+        marker="const Ref<Font> ui_font = SceneUtils::get_orchestrator_font();")
     replace(root / "src/editor/graph/graph_panel.cpp",
         '    _theme_cache.label_font = SceneUtils::get_editor_font("main_msdf");\n'
         '    _theme_cache.label_bold_font = SceneUtils::get_editor_font("main_bold_msdf");\n',
