@@ -2,32 +2,19 @@
 """Bundle a subsetted Noto Sans CJK SC font and wire it into Orchestrator UI themes."""
 import argparse
 import shutil
+import subprocess
 from pathlib import Path
-from fontTools.ttLib import TTCollection
-from fontTools import subset
-
-UNICODES = (
-    set(range(0x20, 0x7F)) | set(range(0xA0, 0x100))
-    | set(range(0x2000, 0x2070)) | set(range(0x3000, 0x3040))
-    | set(range(0x4E00, 0xA000)) | set(range(0xFF00, 0xFFF0))
-)
 
 def make_font(source: Path, output: Path) -> None:
-    face = TTCollection(str(source)).fonts[2]  # Noto Sans CJK SC
-    options = subset.Options()
-    options.layout_features = []
-    options.name_IDs = [0, 1, 2, 4, 6]
-    options.name_legacy = False
-    options.name_languages = [0x409]
-    options.notdef_glyph = True
-    options.notdef_outline = True
-    options.recommended_glyphs = True
-    options.glyph_names = False
-    worker = subset.Subsetter(options=options)
-    worker.populate(unicodes=UNICODES)
-    worker.subset(face)
     output.parent.mkdir(parents=True, exist_ok=True)
-    face.save(str(output))
+    subprocess.run([
+        "pyftsubset", str(source), "--font-number=2",
+        f"--output-file={output}",
+        "--unicodes=U+0020-007E,U+00A0-00FF,U+2000-206F,U+3000-303F,U+4E00-9FFF,U+FF00-FFEF",
+        "--layout-features=", "--name-IDs=0,1,2,4,6", "--name-languages=0x409",
+        "--no-name-legacy", "--no-glyph-names", "--notdef-glyph", "--notdef-outline",
+        "--recommended-glyphs",
+    ], check=True)
 
 def replace(path: Path, old: str, new: str, expected: int = 1) -> None:
     text = path.read_text(encoding="utf-8")
