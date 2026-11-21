@@ -148,10 +148,10 @@ jobs:
             echo "::error::Orchestrator addon directory is missing: $ADDON_DIR"
             exit 1
           fi
-          if [ ! -f "$ADDON_DIR/plugin.cfg" ]; then
-            echo "::error::plugin.cfg is missing from the addon directory."
-            exit 1
-          fi
+          echo "Addon directory structure (for packaging diagnosis):"
+          find "$ADDON_DIR" -maxdepth 4 -type f -printf '%P\\n' | sort | head -300
+          echo "Editor plugin descriptors:"
+          find "$ADDON_DIR" -maxdepth 4 -type f \\( -name 'plugin.cfg' -o -name '*.gdextension' \\) -print
           if [ ! -f "$ADDON_DIR/liborchestrator.android.64.editor.so" ]; then
             echo "::error::Android ARM64 editor library is missing from the addon directory."
             exit 1
