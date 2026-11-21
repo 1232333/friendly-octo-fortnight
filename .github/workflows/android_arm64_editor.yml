@@ -71,23 +71,11 @@ jobs:
           ls -la "$PROJECT_DIR"
 
 
-      - name: Apply Simplified Chinese editor localization
+      - name: Install ASCII-only runtime localization bootstrap
         shell: bash
         run: |
           set -euo pipefail
-          python "$GITHUB_WORKSPACE/tools/localization/apply_translations.py" \
-            --root "$PROJECT_DIR" \
-            --translations "$GITHUB_WORKSPACE/tools/localization/zh_CN.json" \
-            --report "$RUNNER_TEMP/orchestrator-zh-CN-translation-report.json"
-          cat "$RUNNER_TEMP/orchestrator-zh-CN-translation-report.json"
-
-      - name: Upload localization application report
-        uses: actions/upload-artifact@v4
-        with:
-          name: Orchestrator-zh-CN-Applied-Source-Report
-          path: ${{ runner.temp }}/orchestrator-zh-CN-translation-report.json
-          if-no-files-found: error
-          retention-days: 14
+          python "$GITHUB_WORKSPACE/tools/localization/apply_runtime_loader.py" --root "$PROJECT_DIR"
 
       - name: Install build tools
         run: |
@@ -101,13 +89,6 @@ jobs:
 
       - name: Install SCons
         run: python -m pip install --upgrade pip scons==4.10.1 fonttools==4.63.0
-
-      - name: Apply bundled Simplified Chinese font fallback
-        shell: bash
-        run: |
-          set -euo pipefail
-          python "$GITHUB_WORKSPACE/tools/localization/apply_chinese_font.py" --root "$PROJECT_DIR" --regular /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc --bold /usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc --license /usr/share/doc/fonts-noto-cjk/copyright
-          find "$PROJECT_DIR/project/addons/orchestrator/fonts" -maxdepth 1 -type f -printf '%f %s bytes' | sort
 
       - name: Set up Android NDK
         uses: nttld/setup-ndk@v1
@@ -164,6 +145,20 @@ jobs:
           fi
           ls -lh "$LIBRARY"
 
+      - name: Prepare post-build Simplified Chinese translation resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python "$GITHUB_WORKSPACE/tools/localization/prepare_runtime_localization.py" \
+            --root "$PROJECT_DIR" \
+            --translations "$GITHUB_WORKSPACE/tools/localization/zh_CN.json" \
+            --loader "$GITHUB_WORKSPACE/tools/localization/translation_loader.gd" \
+            --regular /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc \
+            --bold /usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc \
+            --license /usr/share/doc/fonts-noto-cjk/copyright
+          echo "Post-build translation and font assets:"
+          find "$PROJECT_DIR/project/addons/orchestrator/locale" "$PROJECT_DIR/project/addons/orchestrator/fonts" -maxdepth 1 -type f -printf '%P %s bytes\\n' | sort
+
       - name: Package complete Orchestrator Android plugin
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
@@ -196,7 +191,7 @@ jobs:
             zip -qr "$RUNNER_TEMP/Orchestrator-Android-ARM64-Editor-Plugin.zip" addons
           )
           echo "Packaged addon files:"
-          find "$RUNNER_TEMP/orchestrator-plugin-package/orchestrator" -type f | sort
+          find "$RUNNER_TEMP/orchestrator-plugin-package/addons/orchestrator" -type f | sort
           ls -lh "$RUNNER_TEMP/Orchestrator-Android-ARM64-Editor-Plugin.zip"
 
       - name: Upload complete Orchestrator Android plugin
