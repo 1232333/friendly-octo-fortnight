@@ -94,6 +94,7 @@ def main() -> None:
         "src/editor/script_editor_view.cpp": [('SceneUtils::get_editor_font("main")', 'SceneUtils::get_orchestrator_font()', 2)],
         "src/editor/settings/input_event_configuration_dialog.cpp": [('SceneUtils::get_editor_font("bold")', 'SceneUtils::get_orchestrator_font(true)', 1)],
         "src/editor/gui/sectioned_inspector.cpp": [('SceneUtils::get_editor_font("bold")', 'SceneUtils::get_orchestrator_font(true)', 1)],
+        "src/editor/gui/about_dialog.cpp": [('get_theme_font(StringName("source"), "EditorFonts")', 'SceneUtils::get_orchestrator_font()', 1)],
         "src/editor/doc/editor_help.cpp": [
             ('SceneUtils::get_editor_font("doc_bold")', 'SceneUtils::get_orchestrator_font(true)', 3),
             ('SceneUtils::get_editor_font("doc_italic")', 'SceneUtils::get_orchestrator_font()', 1),
