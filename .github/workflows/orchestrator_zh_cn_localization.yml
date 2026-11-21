@@ -1,0 +1,58 @@
+name: Orchestrator Chinese Localization Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - localization-workflow
+    paths:
+      - ".github/dispatch/localization.txt"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orchestrator-localization-audit
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout localization workflow
+        uses: actions/checkout@v4
+
+      - name: Extract Orchestrator source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/orchestrator-source"
+          ZIP_FILE="$(find "$GITHUB_WORKSPACE" -maxdepth 2 -type f -name 'Orchestrator_2.5_原工作流兼容版_Android_ARM64_汉化源码.zip' -print -quit)"
+          if [ -z "$ZIP_FILE" ]; then
+            echo "::error::Orchestrator source ZIP was not found in the repository."
+            exit 1
+          fi
+          unzip -q "$ZIP_FILE" -d "$RUNNER_TEMP/orchestrator-source"
+          CMAKE_FILE="$(find "$RUNNER_TEMP/orchestrator-source" -name CMakeLists.txt -not -path '*/extern/*' -print -quit)"
+          if [ -z "$CMAKE_FILE" ]; then
+            echo "::error::Could not locate the Orchestrator source root."
+            find "$RUNNER_TEMP/orchestrator-source" -maxdepth 4 -type f | head -200
+            exit 1
+          fi
+          echo "SOURCE_ROOT=$(dirname "$CMAKE_FILE")" >> "$GITHUB_ENV"
+          echo "Source root: $(dirname "$CMAKE_FILE")"
+
+      - name: Scan English strings and build zh-CN catalog
+        run: |
+          set -euo pipefail
+          python tools/localization/scan_english.py --root "$SOURCE_ROOT" --out "$RUNNER_TEMP/localization-report"
+          sed -n '1,100p' "$RUNNER_TEMP/localization-report/scan_summary.md"
+
+      - name: Upload Chinese localization audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orchestrator-zh-CN-Localization-Audit
+          path: ${{ runner.temp }}/localization-report/
+          if-no-files-found: error
+          retention-days: 30
