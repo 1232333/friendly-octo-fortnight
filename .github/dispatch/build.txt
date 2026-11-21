@@ -1,7 +1,5 @@
-request=android-arm64-editor-with-zh-cn-localization
+request=android-arm64-editor-post-build-zh-cn-localization
 locale=zh_CN
-purpose=compile-translated-orchestrator-source
-
-request=android-arm64-editor-with-embedded-noto-sans-sc-font
-
-request=android-arm64-editor-addon-root-layout
+translation=runtime-po-domain
+font=post-build-noto-sans-sc
+source_translation=disabled
