@@ -48,12 +48,12 @@ func _build_screen() -> void:
     screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
     var title := Label.new()
-    title.text = "中文编程语言 0.1.0"
+    title.text = "中文游戏编程语言 0.2.0"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     screen.add_child(title)
 
     var help := Label.new()
-    help.text = "使用中文编写 .zh 脚本，点击编译后生成 Godot GDScript。"
+    help.text = "先选中场景中的游戏节点，再编写中文事件脚本。编译后会将可执行脚本绑定到该节点。"
     help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     screen.add_child(help)
 
@@ -65,7 +65,7 @@ func _build_screen() -> void:
     screen.add_child(source_editor)
 
     var compile_button := Button.new()
-    compile_button.text = "编译并保存 .zh → .gd"
+    compile_button.text = "编译并绑定到选中节点"
     compile_button.custom_minimum_size = Vector2(0, 48)
     compile_button.pressed.connect(_compile_source)
     screen.add_child(compile_button)
@@ -104,7 +104,17 @@ func _compile_source() -> void:
         output_editor.text = ""
         return
 
-    var generated := str(result.get("code", ""))
+    var selected_nodes: Array[Node] = get_editor_interface().get_selection().get_selected_nodes()
+    if selected_nodes.is_empty():
+        status_label.text = "请先在场景树或 2D/3D 视图中选中一个游戏节点"
+        return
+    var target: Node = selected_nodes[0]
+    var base_class := target.get_class()
+    if not base_class.is_valid_identifier():
+        status_label.text = "无法确定目标节点类型：" + base_class
+        return
+
+    var generated := "extends " + base_class + "\n\n" + str(result.get("code", ""))
     var source_dir := ProjectSettings.globalize_path("res://scripts")
     var output_dir := ProjectSettings.globalize_path("res://generated")
     var source_error := DirAccess.make_dir_recursive_absolute(source_dir)
@@ -130,6 +140,21 @@ func _compile_source() -> void:
     output_file.store_string(generated)
     output_file.close()
 
+    var runtime_script := GDScript.new()
+    runtime_script.source_code = generated
+    var script_error := runtime_script.reload()
+    if script_error != OK:
+        status_label.text = "生成脚本无法通过 Godot 检查，错误码：" + str(script_error)
+        output_editor.text = generated
+        return
+
+    var previous_script: Script = target.get_script()
+    var undo_redo := get_undo_redo()
+    undo_redo.create_action("绑定中文游戏脚本")
+    undo_redo.add_do_property(target, "script", runtime_script)
+    undo_redo.add_undo_property(target, "script", previous_script)
+    undo_redo.commit_action()
+
     output_editor.text = generated
     get_editor_interface().get_resource_filesystem().scan()
-    status_label.text = "编译成功！中文源码已保存到 %s，GDScript 已生成到 %s" % [SOURCE_PATH, OUTPUT_PATH]
+    status_label.text = "编译并绑定成功！脚本已附加到节点“%s”（%s）。运行场景即可执行。" % [target.name, base_class]
