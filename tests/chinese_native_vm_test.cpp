@@ -11,6 +11,12 @@ int main(){
  auto bytes=c.bytecode.encode();require(bytes.size()>6&&bytes[0]=='Z'&&bytes[1]=='H',"emits native ZHBC");
  chinese::Bytecode decoded;std::string err;require(chinese::Bytecode::decode(bytes,decoded,err),"decode bytecode");
  auto r=vm.run(decoded);require(r.ok,"VM executes bytecode");require(r.output=="分数： 80\n及格\n","expected VM output");
+
+ auto wrong_integer=f.compile("变量 生命值: 整数 = \"满血\"\n");require(!wrong_integer.ok,"string cannot initialize integer");
+ auto wrong_type=f.compile("变量 标记: 颜色 = 3\n");require(!wrong_type.ok,"unknown type name rejected");
+ auto wrong_math=f.compile("变量 结果 = \"文字\" - 2\n");require(!wrong_math.ok,"invalid arithmetic types rejected");
+ auto wrong_condition=f.compile("如果 123:\n打印(1)\n结束\n");require(!wrong_condition.ok,"if condition must be boolean");
+ auto inferred=f.compile("变量 总分 = 10 + 20\n变量 名称: 字符串 = \"测试\"\n打印(总分, 名称)\n");require(inferred.ok,"type inference and valid annotations accepted");
  auto unknown=f.compile("打印(不存在)\n");require(!unknown.ok,"undeclared variable rejected");
  auto malformed=f.compile("打印(\"坏字符串)\n");require(!malformed.ok,"unterminated string rejected");
  auto div=f.compile("打印(8 / 0)\n");require(div.ok,"division program compiles");require(!vm.run(div.bytecode).ok,"division by zero rejected at runtime");
