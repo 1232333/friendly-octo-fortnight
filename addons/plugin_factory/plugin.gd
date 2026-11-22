@@ -228,8 +228,8 @@ func _show_plugin_details(index: int) -> void:
         return
 
     var plugin: Dictionary = visible_plugins[index]
-    var dependencies: Array = []
-    var conflicts: Array = []
+    var dependencies := PackedStringArray()
+    var conflicts := PackedStringArray()
     for item in plugin.get("dependencies", []):
         dependencies.append(str(item))
     for item in plugin.get("conflicts", []):
