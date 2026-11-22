@@ -43,6 +43,9 @@ jobs:
           test -s addons/plugin_factory/templates/cpp_extension/src/register_types.cpp
           test -s addons/plugin_factory/templates/cpp_extension/src/chinese_compiler.cpp
           test -s addons/plugin_factory/templates/cpp_extension/src/chinese_language_binding.cpp
+          test -s addons/plugin_factory/templates/chinese_programming_language/plugin.cfg
+          test -s addons/plugin_factory/templates/chinese_programming_language/plugin.gd
+          test -s addons/plugin_factory/templates/chinese_programming_language/chinese_native.gdextension
           test -s tests/chinese_compiler_test.cpp
           test -s addons/plugin_factory/templates/cpp_extension/chinese_native.gdextension.template
           grep -Fq '[plugin]' addons/plugin_factory/plugin.cfg
@@ -60,6 +63,9 @@ jobs:
           grep -q '导入 ZIP 插件包' addons/plugin_factory/plugin.gd
           grep -q '编译 C++ 扩展' addons/plugin_factory/plugin.gd
           grep -q '打包整个项目 ZIP' addons/plugin_factory/plugin.gd
+          grep -q '打包中文编程插件 ZIP' addons/plugin_factory/plugin.gd
+          grep -q 'package_chinese_plugin' tools/termux_cpp_builder/server.py
+          grep -q 'addons.*chinese_programming_language.*bin.*android' tools/termux_cpp_builder/server.py
           python3 -m py_compile tools/termux_cpp_builder/server.py
           python3 -m unittest discover -s tests -p 'test_termux_builder.py'
           ! grep -q 'ZIPWriter' addons/plugin_factory/plugin.gd
