@@ -40,7 +40,10 @@ jobs:
           test -s addons/plugin_factory/importer.gd
           test -s tools/termux_cpp_builder/server.py
           test -s addons/plugin_factory/templates/cpp_extension/CMakeLists.txt
-          test -s addons/plugin_factory/templates/cpp_extension/src/register_types.cpp\n          test -s addons/plugin_factory/templates/cpp_extension/src/chinese_compiler.cpp\n          test -s addons/plugin_factory/templates/cpp_extension/src/chinese_language_binding.cpp\n          test -s tests/chinese_compiler_test.cpp
+          test -s addons/plugin_factory/templates/cpp_extension/src/register_types.cpp
+          test -s addons/plugin_factory/templates/cpp_extension/src/chinese_compiler.cpp
+          test -s addons/plugin_factory/templates/cpp_extension/src/chinese_language_binding.cpp
+          test -s tests/chinese_compiler_test.cpp
           test -s addons/plugin_factory/templates/cpp_extension/chinese_native.gdextension.template
           grep -Fq '[plugin]' addons/plugin_factory/plugin.cfg
           grep -q '^@tool' addons/plugin_factory/plugin.gd
