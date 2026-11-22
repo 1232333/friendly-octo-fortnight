@@ -61,7 +61,7 @@ func _build_screen() -> void:
     source_editor.size_flags_vertical = Control.SIZE_EXPAND_FILL
     source_editor.custom_minimum_size = Vector2(0, 220)
     source_editor.placeholder_text = "在这里输入中文程序……"
-    source_editor.text = "变量 分数 = 80\n打印(分数)\n\n如果 分数 >= 60:\n    打印(\"及格\")\n否则:\n    打印(\"不及格\")\n结束\n"
+    source_editor.text = "当 游戏开始:\n    变量 分数 = 80\n    打印(\"分数：\", 分数)\n    如果 分数 >= 60:\n        打印(\"及格\")\n    否则:\n        打印(\"不及格\")\n    结束\n结束\n"
     screen.add_child(source_editor)
 
     var compile_button := Button.new()
