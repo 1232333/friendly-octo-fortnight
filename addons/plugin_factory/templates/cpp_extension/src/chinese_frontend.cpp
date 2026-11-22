@@ -29,7 +29,7 @@ class Lexer {
 };
 class Parser {
  std::vector<Tok> t;size_t p=0;Bytecode b;std::unordered_map<std::string,int> locals;std::string err;
- const Tok& cur()const{return t[p];} bool eat(K k){if(cur().k==k){++p;return true;}return false;}
+ const Tok& cur()const{return t[p];} bool is_else()const{return cur().k==K::Else||cur().s=="否则";} bool eat(K k){if(cur().k==k){++p;return true;}return false;}
  bool need(K k,const char*m){if(eat(k))return true;fail(m);return false;}
  void fail(const std::string&m){if(err.empty())err="第 "+std::to_string(cur().line)+" 行："+m;}
  int constant(Constant c){b.constants.push_back(std::move(c));return (int)b.constants.size()-1;}
@@ -49,9 +49,9 @@ class Parser {
  void statement(){
   if(eat(K::Var)){Tok name=cur();if(!need(K::Id,"变量声明后需要名称"))return;if(locals.count(name.s)){fail("变量重复声明“"+name.s+"”");return;}if(eat(K::Colon)){if(cur().k!=K::Id){fail("类型标注后需要类型名称");return;}++p;}if(!need(K::Eq,"变量声明需要“=”"))return;expr();int slot=(int)locals.size();locals[name.s]=slot;emit(Op::StoreLocal,slot,name.line);b.local_count=(uint32_t)locals.size();return;}
   if(eat(K::Print)){int n=0;if(eat(K::LParen)){if(cur().k!=K::RParen){do{expr();++n;}while(eat(K::Comma));}need(K::RParen,"打印语句缺少右括号");}else{expr();n=1;}emit(Op::Print,n);return;}
-  if(eat(K::If)){expr();need(K::Colon,"如果条件后需要冒号“:”");int jf=(int)b.instructions.size();emit(Op::JumpIfFalse,0);while(cur().k!=K::Else&&cur().k!=K::EndBlock&&cur().k!=K::End&&err.empty())statement();if(eat(K::Else)){int j=(int)b.instructions.size();emit(Op::Jump,0);b.instructions[jf].operand=(int)b.instructions.size();while(cur().k!=K::EndBlock&&cur().k!=K::End&&err.empty())statement();b.instructions[j].operand=(int)b.instructions.size();}else b.instructions[jf].operand=(int)b.instructions.size();if(cur().k==K::EndBlock)++p;else fail("如果代码块缺少“结束”");return;}
+  if(eat(K::If)){expr();need(K::Colon,"如果条件后需要冒号“:”");int jf=(int)b.instructions.size();emit(Op::JumpIfFalse,0);while(!is_else()&&cur().k!=K::EndBlock&&cur().k!=K::End&&err.empty())statement();if(is_else()){++p;int j=(int)b.instructions.size();emit(Op::Jump,0);b.instructions[jf].operand=(int)b.instructions.size();while(cur().k!=K::EndBlock&&cur().k!=K::End&&err.empty())statement();b.instructions[j].operand=(int)b.instructions.size();}else b.instructions[jf].operand=(int)b.instructions.size();if(cur().k==K::EndBlock)++p;else fail("如果代码块缺少“结束”");return;}
   if(eat(K::EndBlock)||eat(K::Else)){fail("此处出现多余的代码块结束标记");return;}
-  fail("不支持的语句；目前支持变量、打印和如果");
+  fail("不支持的语句“"+cur().s+"”；目前支持变量、打印和如果");
  }
  public: explicit Parser(std::vector<Tok>v):t(std::move(v)){}
  FrontendResult run(){while(cur().k!=K::End&&err.empty())statement();if(err.empty())emit(Op::Halt);FrontendResult r;r.ok=err.empty();r.error=err;r.bytecode=std::move(b);return r;}
