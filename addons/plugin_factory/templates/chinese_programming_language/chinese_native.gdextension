@@ -1,0 +1,7 @@
+[configuration]
+entry_symbol = "chinese_native_library_init"
+compatibility_minimum = "4.5"
+reloadable = true
+
+[libraries]
+android.arm64 = "res://addons/chinese_programming_language/bin/android/libchinese_native.so"
