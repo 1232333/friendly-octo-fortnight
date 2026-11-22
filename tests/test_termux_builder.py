@@ -76,7 +76,9 @@ class BuilderTests(unittest.TestCase):
 
     def test_allow_git_directory_registers_only_exact_checkout_path(self):
         with tempfile.TemporaryDirectory() as temporary:
-            checkout = Path(temporary) / "project" / ".plugin_factory" / "cpp-build" / "_deps" / "godot-cpp-src"
+            project = Path(temporary) / "project"
+            project.mkdir()
+            checkout = project / ".plugin_factory" / "cpp-build" / "_deps" / "godot-cpp-src"
             with patch.object(
                 builder.subprocess, "run",
                 side_effect=[
@@ -84,7 +86,9 @@ class BuilderTests(unittest.TestCase):
                     __import__("subprocess").CompletedProcess([], 0, stdout="", stderr=""),
                 ],
             ) as run:
-                builder.allow_git_directory(checkout, Path(temporary) / "project")
+                builder.allow_git_directory(checkout, project)
+            self.assertEqual(run.call_args_list[0].kwargs["cwd"], str(project))
+            self.assertEqual(run.call_args_list[1].kwargs["cwd"], str(project))
             self.assertEqual(run.call_args_list[0].args[0], [
                 "git", "config", "--global", "--get-all", "safe.directory"
             ])
