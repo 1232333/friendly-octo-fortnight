@@ -19,7 +19,11 @@ mkdir -p "$INSTALL_DIR" "$NDK_PARENT"
 cp "$SCRIPT_DIR/server.py" "$INSTALL_DIR/server.py"
 chmod 700 "$INSTALL_DIR/server.py"
 
-TOOLCHAIN="$(find "$NDK_PARENT" -path '*/build/cmake/android.toolchain.cmake' -type f -print -quit || true)"
+if [ -n "${ANDROID_NDK_HOME:-}" ] && [ -f "$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" ]; then
+  TOOLCHAIN="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake"
+else
+  TOOLCHAIN="$(find "$NDK_PARENT" -path '*/build/cmake/android.toolchain.cmake' -type f -print -quit || true)"
+fi
 if [ -z "$TOOLCHAIN" ]; then
   echo
   echo "正在下载适配 ARM64 Termux 的 Android NDK r29。文件较大，首次安装需要等待。"
