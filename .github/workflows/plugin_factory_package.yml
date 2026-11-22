@@ -41,7 +41,7 @@ jobs:
           test -s tools/termux_cpp_builder/server.py
           test -s addons/plugin_factory/templates/cpp_extension/CMakeLists.txt
           test -s addons/plugin_factory/templates/cpp_extension/src/register_types.cpp
-          test -s addons/plugin_factory/templates/cpp_extension/chinese_native.gdextension
+          test -s addons/plugin_factory/templates/cpp_extension/chinese_native.gdextension.template
           grep -Fq '[plugin]' addons/plugin_factory/plugin.cfg
           grep -q '^@tool' addons/plugin_factory/plugin.gd
           grep -q 'FACTORY_VERSION := "0.4.0"' addons/plugin_factory/plugin.gd
