@@ -42,7 +42,7 @@ class Parser {
   else if(eat(K::Number)){Constant c;if(tok.s.find('.')!=std::string::npos){c.kind=Constant::Kind::Float;c.real=std::stod(tok.s);}else{c.kind=Constant::Kind::Integer;c.integer=std::stoll(tok.s);}emit(c.kind==Constant::Kind::Float?Op::PushFloat:Op::PushInt,constant(c),tok.line);}
   else if(eat(K::String)){Constant c;c.kind=Constant::Kind::String;c.text=tok.s;emit(Op::PushString,constant(c),tok.line);}
   else if(eat(K::True)||eat(K::False)){Constant c;c.kind=Constant::Kind::Boolean;c.boolean=tok.k==K::True;emit(Op::PushBool,constant(c),tok.line);}
-  else if(eat(K::Id)){auto it=locals.find(tok.s);if(it==locals.end()){fail("使用了未声明的变量“"+tok.s+"”");return;}emit(Op::LoadLocal,it->second,tok.line);}
+  else if(eat(K::Id)){if(eat(K::LParen)){Constant fn;fn.kind=Constant::Kind::String;fn.text=tok.s;emit(Op::PushString,constant(fn),tok.line);int argc=0;if(cur().k!=K::RParen){do{expr();++argc;}while(eat(K::Comma));}need(K::RParen,"函数调用缺少右括号");emit(Op::HostCall,argc,tok.line);}else{auto it=locals.find(tok.s);if(it==locals.end()){fail("使用了未声明的变量“"+tok.s+"”");return;}emit(Op::LoadLocal,it->second,tok.line);}}
   else{fail("此处需要表达式");return;}
   while(err.empty()){int prec=precedence(cur().k);if(prec<min)break;K op=cur().k;int ln=cur().line;++p;expr(prec+1);Op code=Op::Add;switch(op){case K::Plus:code=Op::Add;break;case K::Minus:code=Op::Sub;break;case K::Star:code=Op::Mul;break;case K::Slash:code=Op::Div;break;case K::Percent:code=Op::Mod;break;case K::EqEq:code=Op::Eq;break;case K::Ne:code=Op::Ne;break;case K::Lt:code=Op::Lt;break;case K::Le:code=Op::Le;break;case K::Gt:code=Op::Gt;break;case K::Ge:code=Op::Ge;break;default:break;}emit(code,0,ln);}
  }
