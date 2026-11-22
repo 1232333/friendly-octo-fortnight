@@ -1,4 +1,5 @@
 #include "hello_extension.hpp"
+#include "chinese_language_binding.hpp"
 
 #include <godot_cpp/godot.hpp>
 
@@ -9,6 +10,7 @@ void initialize_chinese_native(ModuleInitializationLevel level) {
         return;
     }
     ClassDB::register_class<HelloNative>();
+    ClassDB::register_class<ChineseLanguage>();
 }
 
 void uninitialize_chinese_native(ModuleInitializationLevel level) {
