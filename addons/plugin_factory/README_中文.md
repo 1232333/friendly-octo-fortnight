@@ -11,7 +11,7 @@
 - **C++ GDExtension 模板**：一键创建 godot-cpp CMake 工程、C++ 类和 `.gdextension` 声明。
 - **Android ARM64 编译**：使用 Termux 适配 NDK r29 工具链、CMake 和 Ninja 编译 Android 动态库，输出到 `bin/native/libchinese_native.so`。
 - **项目 ZIP 打包**：打包 Godot 项目源码和生成的动态库，排除 `.godot`、`.git` 与中间构建缓存。
-- **安全边界**：编译代理仅监听 `127.0.0.1:8766`，并限制项目路径在 Android 共享存储中。
+- **安全边界**：编译代理仅监听 `127.0.0.1:8766`，编译/打包要求本机密钥，并限制项目路径在 Android 共享存储中。
 
 ## 0.3.0 更新
 - **自动补齐依赖**：从所选插件开始递归解析依赖，并按依赖优先顺序生成最终组合。
@@ -51,4 +51,4 @@ conflicts=["incompatible_addon_folder"]
 - GitHub Actions 会解析 Godot 插件脚本、运行代理单元测试，并在 Linux CI 编译 C++ 示例扩展；这不等同于 Termux Android ARM64 真机编译或 Android 编辑器加载验证。
 
 ## Termux 编译代理安装
-参阅 `tools/termux_cpp_builder/README_中文.md`，在原生 Termux 执行 `bash setup.sh`（安装时会下载 Android NDK r29），然后运行 `$HOME/.plugin_factory_builder/start.sh`。回到 Godot 插件工厂，先测试连接，再创建 C++ 模板、编译和打包。
+参阅 `tools/termux_cpp_builder/README_中文.md`，在原生 Termux 执行 `bash setup.sh`（安装时会下载 Android NDK r29），然后运行 `$HOME/.plugin_factory_builder/start.sh`。复制 Termux 显示的本机密钥并粘贴到 Godot 插件工厂的密钥框；密钥保存在 `user://`。然后测试连接、创建 C++ 模板、编译和打包。
