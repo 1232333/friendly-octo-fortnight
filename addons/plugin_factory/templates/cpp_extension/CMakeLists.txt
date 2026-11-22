@@ -16,7 +16,8 @@ FetchContent_MakeAvailable(godot-cpp)
 
 add_library(chinese_native SHARED
     src/hello_extension.cpp
-    src/chinese_compiler.cpp
+    src/chinese_frontend.cpp
+    src/chinese_vm.cpp
     src/chinese_language_binding.cpp
     src/register_types.cpp
 )
