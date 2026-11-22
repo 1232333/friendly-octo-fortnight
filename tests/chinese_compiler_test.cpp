@@ -29,6 +29,14 @@ int main() {
     require(result.generated_code.find("else:") != std::string::npos, "否则 becomes else");
     require(result.generated_code.find("print") != std::string::npos, "打印 becomes print");
 
+    const auto decimal = compiler.compile("变量 圆周率 = 3.14159\n");
+    require(decimal.ok, "decimal literal compiles");
+    require(decimal.generated_code.find("3.14159") != std::string::npos, "decimal literal remains intact");
+
+    const auto function = compiler.compile("函数 问候(名字):\n打印(名字)\n结束\n");
+    require(function.ok, "Chinese function declaration compiles");
+    require(function.generated_code.find("func _zh_") != std::string::npos, "函数 becomes func");
+
     const auto unmatched = compiler.compile("结束\n");
     require(!unmatched.ok, "unmatched 结束 is rejected");
 
