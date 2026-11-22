@@ -1,7 +1,8 @@
 @tool
 extends EditorPlugin
 
-const FACTORY_VERSION := "0.3.0"
+const FACTORY_VERSION := "0.3.1"
+const PluginImporter = preload("res://addons/plugin_factory/importer.gd")
 const OUTPUT_PATH := "user://PluginFactory_Output.zip"
 const PROFILE_PATH := "user://PluginFactory/profiles.json"
 const EXCLUDED_DIRS := [".git", ".godot", "__pycache__", ".import"]
@@ -15,6 +16,8 @@ var log_view: RichTextLabel
 var status_label: Label
 var profile_name_input: LineEdit
 var profile_selector: OptionButton
+var folder_dialog: FileDialog
+var zip_dialog: FileDialog
 var discovered_plugins: Array[Dictionary] = []
 var visible_plugins: Array[Dictionary] = []
 var saved_profiles: Array[Dictionary] = []
@@ -80,6 +83,38 @@ func _create_interface() -> void:
     scan_button.custom_minimum_size = Vector2(0, 44)
     scan_button.pressed.connect(_scan_plugins)
     panel.add_child(scan_button)
+
+    var import_row := HBoxContainer.new()
+    panel.add_child(import_row)
+
+    var import_folder_button := Button.new()
+    import_folder_button.text = "导入本地插件文件夹"
+    import_folder_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    import_folder_button.custom_minimum_size = Vector2(0, 44)
+    import_folder_button.pressed.connect(_open_folder_dialog)
+    import_row.add_child(import_folder_button)
+
+    var import_zip_button := Button.new()
+    import_zip_button.text = "导入 ZIP 插件包"
+    import_zip_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    import_zip_button.custom_minimum_size = Vector2(0, 44)
+    import_zip_button.pressed.connect(_open_zip_dialog)
+    import_row.add_child(import_zip_button)
+
+    folder_dialog = FileDialog.new()
+    folder_dialog.title = "选择插件文件夹（其中必须包含 plugin.cfg）"
+    folder_dialog.file_mode = FileDialog.FILE_MODE_OPEN_DIR
+    folder_dialog.access = FileDialog.ACCESS_FILESYSTEM
+    folder_dialog.dir_selected.connect(_import_folder)
+    main_screen.add_child(folder_dialog)
+
+    zip_dialog = FileDialog.new()
+    zip_dialog.title = "选择 ZIP 插件包"
+    zip_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+    zip_dialog.access = FileDialog.ACCESS_FILESYSTEM
+    zip_dialog.filters = PackedStringArray(["*.zip ; ZIP 插件包"])
+    zip_dialog.file_selected.connect(_import_zip)
+    main_screen.add_child(zip_dialog)
 
     search_input = LineEdit.new()
     search_input.placeholder_text = "搜索插件名称、目录或版本…"
@@ -675,3 +710,41 @@ func _pack_directory(zip: ZIPPacker, source: String, destination: String) -> boo
 
     dir.list_dir_end()
     return true
+
+
+
+func _open_folder_dialog() -> void:
+    folder_dialog.popup_centered_ratio(0.85)
+
+
+func _open_zip_dialog() -> void:
+    zip_dialog.popup_centered_ratio(0.85)
+
+
+func _import_folder(path: String) -> void:
+    _run_import(PluginImporter.import_folder(
+        path,
+        ProjectSettings.globalize_path("res://addons")
+    ), "文件夹")
+
+
+func _import_zip(path: String) -> void:
+    _run_import(PluginImporter.import_zip(
+        path,
+        ProjectSettings.globalize_path("res://addons")
+    ), "ZIP")
+
+
+func _run_import(result: Dictionary, source_type: String) -> void:
+    var imported: Array = result.get("imported", [])
+    var errors: Array = result.get("errors", [])
+    for folder_name in imported:
+        _log("已导入 %s 插件：%s" % [source_type, str(folder_name)])
+    for issue in errors:
+        _log("导入提示：" + str(issue))
+
+    if imported.is_empty():
+        status_label.text = "%s 导入未成功，请查看操作日志" % source_type
+    else:
+        _scan_plugins()
+        status_label.text = "%s 导入完成：%d 个插件" % [source_type, imported.size()]
