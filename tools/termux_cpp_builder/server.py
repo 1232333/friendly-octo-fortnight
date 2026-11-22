@@ -107,18 +107,23 @@ def health() -> dict:
     }
     target = tool_version(["clang++", "-dumpmachine"]) if versions["clang"] else None
     required = all(versions[name] for name in ("clang", "cmake", "ninja", "git"))
+    ndk_root = os.environ.get("ANDROID_NDK_HOME") or os.environ.get("ANDROID_NDK_ROOT", "")
+    toolchain = Path(ndk_root) / "build" / "cmake" / "android.toolchain.cmake" if ndk_root else None
+    ndk_ready = bool(toolchain and toolchain.is_file())
     android_target = bool(target and "android" in target.lower())
     return {
-        "ok": required and platform.machine() in ("aarch64", "arm64") and android_target,
+        "ok": required and platform.machine() in ("aarch64", "arm64") and android_target and ndk_ready,
         "service": "Plugin Factory Termux C++ Builder",
         "version": "0.1.0",
         "port": PORT,
         "versions": versions,
         "clang_target": target,
+        "android_ndk_home": str(ndk_root) if ndk_root else "",
+        "ndk_toolchain_ready": ndk_ready,
         "message": (
             "Termux Android ARM64 编译环境就绪"
-            if required and android_target
-            else "请在原生 Termux 安装 clang、cmake、ninja、git；需要 Android ARM64 clang 目标"
+            if required and android_target and ndk_ready
+            else "请安装 Termux clang、CMake、Ninja、Git，并完成 Android NDK 安装（ANDROID_NDK_HOME）"
         ),
     }
 
@@ -139,6 +144,11 @@ def build_cpp(project: Path, payload: dict) -> dict:
     if platform.machine() not in ("aarch64", "arm64"):
         raise ValueError("当前设备不是 ARM64，不能生成 Android ARM64 扩展。")
 
+    ndk_root = os.environ.get("ANDROID_NDK_HOME") or os.environ.get("ANDROID_NDK_ROOT", "")
+    toolchain = Path(ndk_root) / "build" / "cmake" / "android.toolchain.cmake" if ndk_root else None
+    if not toolchain or not toolchain.is_file():
+        raise ValueError("找不到 Android NDK CMake 工具链。请重新运行 Termux 安装脚本。")
+
     cmake = shutil.which("cmake")
     ninja = shutil.which("ninja")
     if not cmake or not ninja:
@@ -149,9 +159,11 @@ def build_cpp(project: Path, payload: dict) -> dict:
     jobs = max(1, min(int(payload.get("jobs", 2)), 4))
     configure = [
         cmake, "-S", str(source), "-B", str(build_dir), "-G", "Ninja",
+        "--toolchain", str(toolchain),
         "-DCMAKE_BUILD_TYPE=Release",
-        "-DCMAKE_CXX_COMPILER=clang++",
-        "-DCMAKE_C_COMPILER=clang",
+        "-DANDROID_ABI=arm64-v8a",
+        "-DANDROID_PLATFORM=android-24",
+        "-DANDROID_STL=c++_static",
         "-DPLUGIN_FACTORY_ANDROID_TERMUX=ON",
     ]
     configured = run_command(configure, project, log_file, timeout=1800)
