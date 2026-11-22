@@ -5,5 +5,3 @@ reloadable = true
 
 [libraries]
 android.arm64 = "res://bin/native/libchinese_native.so"
-linux.debug.x86_64 = "res://bin/native/libchinese_native.so"
-linux.release.x86_64 = "res://bin/native/libchinese_native.so"
