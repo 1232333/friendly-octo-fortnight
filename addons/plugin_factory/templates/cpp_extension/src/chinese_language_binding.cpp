@@ -5,6 +5,7 @@
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/node2d.hpp>
+#include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 using namespace godot;
@@ -98,7 +99,21 @@ bool ChineseProgram::load_bytecode(const String &path) {
 void ChineseProgram::_initialize_runtime() {
     set_process(false);
     has_process_event = false;
-    if (bytecode.is_empty()) return;
+    if (bytecode.is_empty() && !bytecode_path.is_empty()) {
+        Ref<FileAccess> file = FileAccess::open(bytecode_path, FileAccess::READ);
+        if (file.is_null()) {
+            UtilityFunctions::push_error(String("无法读取中文字节码文件：") + bytecode_path);
+            return;
+        }
+        bytecode = file->get_buffer(file->get_length());
+    }
+    if (bytecode.is_empty()) {
+        UtilityFunctions::push_error("中文程序没有可执行的 ZHBC 字节码");
+        return;
+    }
+    SceneTree *tree = get_tree();
+    Node *scene_root = tree != nullptr ? tree->get_current_scene() : nullptr;
+    if (scene_root == nullptr) scene_root = this;
     std::vector<uint8_t> bytes;
     bytes.reserve((size_t)bytecode.size());
     for (int64_t i = 0; i < bytecode.size(); ++i) bytes.push_back(bytecode[i]);
@@ -115,7 +130,7 @@ void ChineseProgram::_initialize_runtime() {
     }
     if (runtime.is_null()) runtime.instantiate();
     if (has_ready_event) {
-        Dictionary result = runtime->run(bytecode, this, String("游戏开始"));
+        Dictionary result = runtime->run(bytecode, scene_root, String("游戏开始"));
         if (!bool(result.get("ok", false))) {
             UtilityFunctions::push_error(String("中文事件“游戏开始”执行失败：") + String(result.get("error", "")));
         }
@@ -125,7 +140,7 @@ void ChineseProgram::_initialize_runtime() {
 void ChineseProgram::_ready() { _initialize_runtime(); }
 void ChineseProgram::_process(double delta) {
     if (!has_process_event || runtime.is_null()) return;
-    Dictionary result = runtime->run(bytecode, this, String("每帧"), delta);
+    Dictionary result = runtime->run(bytecode, get_tree() != nullptr && get_tree()->get_current_scene() != nullptr ? get_tree()->get_current_scene() : this, String("每帧"), delta);
     if (!bool(result.get("ok", false))) {
         UtilityFunctions::push_error(String("中文事件“每帧”执行失败：") + String(result.get("error", "")));
         set_process(false);
