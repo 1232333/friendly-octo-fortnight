@@ -106,7 +106,7 @@ func _create_interface() -> void:
     folder_dialog.file_mode = FileDialog.FILE_MODE_OPEN_DIR
     folder_dialog.access = FileDialog.ACCESS_FILESYSTEM
     folder_dialog.dir_selected.connect(_import_folder)
-    main_screen.add_child(folder_dialog)
+    add_child(folder_dialog)
 
     zip_dialog = FileDialog.new()
     zip_dialog.title = "选择 ZIP 插件包"
@@ -114,7 +114,7 @@ func _create_interface() -> void:
     zip_dialog.access = FileDialog.ACCESS_FILESYSTEM
     zip_dialog.filters = PackedStringArray(["*.zip ; ZIP 插件包"])
     zip_dialog.file_selected.connect(_import_zip)
-    main_screen.add_child(zip_dialog)
+    add_child(zip_dialog)
 
     search_input = LineEdit.new()
     search_input.placeholder_text = "搜索插件名称、目录或版本…"
