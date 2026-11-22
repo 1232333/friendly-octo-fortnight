@@ -134,7 +134,7 @@ func _read_plugin(cfg_path: String, directory: String) -> void:
     var dependencies: Variant = config.get_value(
         "plugin_factory", "dependencies", []
     )
-    if not dependencies is Array and not dependencies is PackedStringArray:
+    if not (dependencies is Array or dependencies is PackedStringArray):
         dependencies = []
 
     discovered_plugins.append({
