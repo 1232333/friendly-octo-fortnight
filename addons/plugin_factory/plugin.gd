@@ -192,7 +192,7 @@ func _create_interface() -> void:
     panel.add_child(cpp_title)
 
     var cpp_help := Label.new()
-    cpp_help.text = "先在 Termux 安装并启动本地编译代理，再从这里创建模板、编译 Android ARM64 扩展和打包项目。"
+    cpp_help.text = "创建可安装的中文编程语言 Godot 插件；由 Termux 编译 Android ARM64 C++ 核心，再打包独立插件 ZIP。"
     cpp_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     panel.add_child(cpp_help)
 
@@ -207,7 +207,7 @@ func _create_interface() -> void:
     cpp_row_one.add_child(connection_button)
 
     var template_button := Button.new()
-    template_button.text = "创建 C++ 扩展模板"
+    template_button.text = "创建中文编程插件"
     template_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     template_button.custom_minimum_size = Vector2(0, 44)
     template_button.pressed.connect(_create_cpp_starter)
@@ -229,6 +229,15 @@ func _create_interface() -> void:
     package_button.custom_minimum_size = Vector2(0, 48)
     package_button.pressed.connect(_package_project)
     cpp_row_two.add_child(package_button)
+
+    var cpp_row_three := HBoxContainer.new()
+    panel.add_child(cpp_row_three)
+    var package_plugin_button := Button.new()
+    package_plugin_button.text = "打包中文编程插件 ZIP"
+    package_plugin_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    package_plugin_button.custom_minimum_size = Vector2(0, 48)
+    package_plugin_button.pressed.connect(_package_chinese_plugin)
+    cpp_row_three.add_child(package_plugin_button)
 
     builder_token_input = LineEdit.new()
     builder_token_input.placeholder_text = "粘贴 Termux 启动时显示的本机连接密钥"
@@ -827,6 +836,10 @@ func _package_project() -> void:
     _request_builder("/package", "package", HTTPClient.METHOD_POST)
 
 
+func _package_chinese_plugin() -> void:
+    _request_builder("/package_plugin", "package_plugin", HTTPClient.METHOD_POST)
+
+
 func _request_builder(endpoint: String, action: String, method: int) -> void:
     if not is_instance_valid(builder_request):
         builder_status_label.text = "编译请求组件尚未初始化"
@@ -900,39 +913,46 @@ func _on_builder_request_completed(
         return
 
     if builder_action == "build":
-        var descriptor_error := _install_gdextension_descriptor()
-        if not descriptor_error.is_empty():
-            builder_status_label.text = "动态库已编译，但扩展声明安装失败：" + descriptor_error
-            _log(builder_status_label.text)
-            builder_action = ""
-            return
         get_editor_interface().get_resource_filesystem().scan()
-        builder_status_label.text = "C++ 编译完成，已安装 GDExtension：" + str(data.get("library", ""))
+        builder_status_label.text = "中文编程 C++ 核心编译完成，已安装到插件目录：" + str(data.get("library", ""))
         _log("Android ARM64 动态库已生成：" + str(data.get("library", "")))
         _log("动态库大小：" + str(data.get("size_bytes", 0)) + " bytes")
     elif builder_action == "package":
         builder_status_label.text = "项目 ZIP 已生成：" + str(data.get("package", ""))
         _log("项目打包完成：" + str(data.get("package", "")))
         _log("打包文件数：" + str(data.get("file_count", 0)))
+    elif builder_action == "package_plugin":
+        builder_status_label.text = "中文编程插件 ZIP 已生成：" + str(data.get("package", ""))
+        _log("中文编程插件独立打包完成：" + str(data.get("package", "")))
+        _log("插件文件数：" + str(data.get("file_count", 0)))
     builder_action = ""
 
 
 func _create_cpp_starter() -> void:
     var project_root := ProjectSettings.globalize_path("res://")
     var cpp_root := project_root.path_join("cpp")
-    var extension_file := project_root.path_join("chinese_native.gdextension")
-    if DirAccess.dir_exists_absolute(cpp_root) or FileAccess.file_exists(extension_file):
-        builder_status_label.text = "项目已有 cpp/ 或 chinese_native.gdextension，为防止覆盖未创建模板"
+    var addon_root := project_root.path_join("addons/chinese_programming_language")
+    if DirAccess.dir_exists_absolute(cpp_root) or DirAccess.dir_exists_absolute(addon_root):
+        builder_status_label.text = "项目已有 cpp/ 或 addons/chinese_programming_language/，为防止覆盖未创建模板"
         return
 
-    var source_root := "res://addons/plugin_factory/templates/cpp_extension"
-    var copy_error := _copy_template_directory(source_root, cpp_root)
-    if not copy_error.is_empty():
-        builder_status_label.text = "创建模板失败：" + copy_error
+    var addons_error := DirAccess.make_dir_recursive_absolute(project_root.path_join("addons"))
+    if addons_error != OK and addons_error != ERR_ALREADY_EXISTS:
+        builder_status_label.text = "无法创建 addons 目录，错误码：" + str(addons_error)
         return
 
-    builder_status_label.text = "C++ 模板已创建。先测试 Termux 连接，再点击编译；编译成功后才会安装扩展声明。"
-    _log("已创建 cpp/ CMake 工程和 C++ 示例类")
+    var cpp_error := _copy_template_directory("res://addons/plugin_factory/templates/cpp_extension", cpp_root)
+    if not cpp_error.is_empty():
+        builder_status_label.text = "创建 C++ 工程失败：" + cpp_error
+        return
+
+    var addon_error := _copy_template_directory("res://addons/plugin_factory/templates/chinese_programming_language", addon_root)
+    if not addon_error.is_empty():
+        builder_status_label.text = "创建 Godot 插件封装失败：" + addon_error
+        return
+
+    builder_status_label.text = "中文编程插件工程已创建：cpp/ + addons/chinese_programming_language/。接下来测试 Termux 连接并编译。"
+    _log("已创建 C++ 编译工程和可启用的中文编程 Godot 插件封装")
 
 
 func _copy_template_directory(source: String, destination: String) -> String:
