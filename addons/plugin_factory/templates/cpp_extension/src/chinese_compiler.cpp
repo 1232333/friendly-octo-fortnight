@@ -195,7 +195,11 @@ CompileResult Compiler::compile(const std::string &source) const {
         output << std::string(static_cast<std::size_t>(indent) * 4, ' ');
 
         if (first == "如果" || first == "循环") {
-            if (tokens.size() < 2) {
+            std::size_t condition_end = tokens.size();
+            if (condition_end > 1 && tokens[condition_end - 1].value == ":") {
+                --condition_end;
+            }
+            if (condition_end < 2) {
                 result.error = "第 " + std::to_string(line_number) + " 行：条件不能为空";
                 return result;
             }
