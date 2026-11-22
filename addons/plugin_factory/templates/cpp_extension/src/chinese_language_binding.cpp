@@ -76,14 +76,19 @@ Dictionary ChineseLanguage::run(const PackedByteArray &bytecode,Node *scene_root
 void ChineseProgram::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_bytecode", "value"), &ChineseProgram::set_bytecode);
     ClassDB::bind_method(D_METHOD("get_bytecode"), &ChineseProgram::get_bytecode);
+    ClassDB::bind_method(D_METHOD("set_bytecode_path", "value"), &ChineseProgram::set_bytecode_path);
+    ClassDB::bind_method(D_METHOD("get_bytecode_path"), &ChineseProgram::get_bytecode_path);
     ClassDB::bind_method(D_METHOD("load_bytecode", "path"), &ChineseProgram::load_bytecode);
     ADD_PROPERTY(PropertyInfo(Variant::PACKED_BYTE_ARRAY, "bytecode"), "set_bytecode", "get_bytecode");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "bytecode_path", PROPERTY_HINT_FILE, "*.zhbc"), "set_bytecode_path", "get_bytecode_path");
 }
 void ChineseProgram::set_bytecode(const PackedByteArray &value) {
     bytecode = value;
     if (is_inside_tree()) _initialize_runtime();
 }
 PackedByteArray ChineseProgram::get_bytecode() const { return bytecode; }
+void ChineseProgram::set_bytecode_path(const String &value) { bytecode_path = value; if (is_inside_tree()) _initialize_runtime(); }
+String ChineseProgram::get_bytecode_path() const { return bytecode_path; }
 bool ChineseProgram::load_bytecode(const String &path) {
     Ref<FileAccess> file = FileAccess::open(path, FileAccess::READ);
     if (file.is_null()) return false;
