@@ -28,7 +28,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate addon structure
+      - name: Validate addon structure and feature markers
         shell: bash
         run: |
           set -euo pipefail
@@ -36,26 +36,33 @@ jobs:
           test -s addons/plugin_factory/plugin.gd
           grep -Fq '[plugin]' addons/plugin_factory/plugin.cfg
           grep -q '^@tool' addons/plugin_factory/plugin.gd
-          ! grep -q 'ZIPWriter' addons/plugin_factory/plugin.gd
+          grep -q 'FACTORY_VERSION := "0.3.0"' addons/plugin_factory/plugin.gd
+          grep -q '_visit_dependency' addons/plugin_factory/plugin.gd
+          grep -q '_resolve_selection' addons/plugin_factory/plugin.gd
+          grep -q '_save_profile' addons/plugin_factory/plugin.gd
+          grep -q '_load_profile' addons/plugin_factory/plugin.gd
           grep -q 'ZIPPacker' addons/plugin_factory/plugin.gd
-          echo "Plugin Factory addon files found."
+          ! grep -q 'ZIPWriter' addons/plugin_factory/plugin.gd
+          grep -q 'get_editor_main_screen' addons/plugin_factory/plugin.gd
+          ! grep -q 'add_control_to_dock' addons/plugin_factory/plugin.gd
+          echo "Plugin Factory 0.3.0 feature markers found."
 
       - name: Create ZIP package
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          zip -qr dist/PluginFactory-0.2.1-Godot-4.7.2.zip addons/plugin_factory
-          unzip -t dist/PluginFactory-0.2.1-Godot-4.7.2.zip
-          sha256sum dist/PluginFactory-0.2.1-Godot-4.7.2.zip | tee dist/SHA256SUMS.txt
+          zip -qr dist/PluginFactory-0.3.0-Godot-4.7.2.zip addons/plugin_factory
+          unzip -t dist/PluginFactory-0.3.0-Godot-4.7.2.zip
+          sha256sum dist/PluginFactory-0.3.0-Godot-4.7.2.zip | tee dist/SHA256SUMS.txt
           ls -lh dist/
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PluginFactory-0.2.1-Godot-4.7.2
+          name: PluginFactory-0.3.0-Godot-4.7.2
           path: |
-            dist/PluginFactory-0.2.1-Godot-4.7.2.zip
+            dist/PluginFactory-0.3.0-Godot-4.7.2.zip
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
