@@ -92,7 +92,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          zip -qr dist/PluginFactory-0.4.0-Godot-4.7.2.zip addons/plugin_factory
+          zip -qr dist/PluginFactory-0.4.0-Godot-4.7.2.zip addons/plugin_factory tools/termux_cpp_builder
           unzip -t dist/PluginFactory-0.4.0-Godot-4.7.2.zip
           sha256sum dist/PluginFactory-0.4.0-Godot-4.7.2.zip | tee dist/SHA256SUMS.txt
           ls -lh dist/
