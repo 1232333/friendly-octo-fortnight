@@ -887,7 +887,14 @@ func _on_builder_request_completed(
         return
 
     if builder_action == "build":
-        builder_status_label.text = "C++ 编译完成：" + str(data.get("library", ""))
+        var descriptor_error := _install_gdextension_descriptor()
+        if not descriptor_error.is_empty():
+            builder_status_label.text = "动态库已编译，但扩展声明安装失败：" + descriptor_error
+            _log(builder_status_label.text)
+            builder_action = ""
+            return
+        get_editor_interface().get_resource_filesystem().scan()
+        builder_status_label.text = "C++ 编译完成，已安装 GDExtension：" + str(data.get("library", ""))
         _log("Android ARM64 动态库已生成：" + str(data.get("library", "")))
         _log("动态库大小：" + str(data.get("size_bytes", 0)) + " bytes")
     elif builder_action == "package":
@@ -911,17 +918,8 @@ func _create_cpp_starter() -> void:
         builder_status_label.text = "创建模板失败：" + copy_error
         return
 
-    var extension_source := source_root.path_join("chinese_native.gdextension.template")
-    var extension_error := DirAccess.copy_absolute(
-        ProjectSettings.globalize_path(extension_source),
-        extension_file
-    )
-    if extension_error != OK:
-        builder_status_label.text = "模板已复制，但扩展声明文件复制失败：" + str(extension_error)
-        return
-
-    builder_status_label.text = "C++ 模板已创建。现在先测试 Termux 连接，再点击编译。"
-    _log("已创建 cpp/、chinese_native.gdextension 和 C++ 示例类")
+    builder_status_label.text = "C++ 模板已创建。先测试 Termux 连接，再点击编译；编译成功后才会安装扩展声明。"
+    _log("已创建 cpp/ CMake 工程和 C++ 示例类")
 
 
 func _copy_template_directory(source: String, destination: String) -> String:
@@ -956,4 +954,18 @@ func _copy_template_directory(source: String, destination: String) -> String:
                 return "复制文件失败：%s（%d）" % [entry, copy_error]
         entry = dir.get_next()
     dir.list_dir_end()
+    return ""
+
+
+
+func _install_gdextension_descriptor() -> String:
+    var source := ProjectSettings.globalize_path(
+        "res://addons/plugin_factory/templates/cpp_extension/chinese_native.gdextension.template"
+    )
+    var destination := ProjectSettings.globalize_path("res://chinese_native.gdextension")
+    if FileAccess.file_exists(destination):
+        return ""
+    var error := DirAccess.copy_absolute(source, destination)
+    if error != OK:
+        return "无法复制 chinese_native.gdextension（错误码 %d）" % error
     return ""
