@@ -1,10 +1,11 @@
 @tool
 extends EditorPlugin
 
-const FACTORY_VERSION := "0.2.0"
+const FACTORY_VERSION := "0.2.1"
 const OUTPUT_PATH := "user://PluginFactory_Output.zip"
 const EXCLUDED_DIRS := [".git", ".godot", "__pycache__", ".import"]
 
+var main_screen: ScrollContainer
 var panel: VBoxContainer
 var search_input: LineEdit
 var plugin_list: ItemList
@@ -17,20 +18,47 @@ var visible_plugins: Array[Dictionary] = []
 
 func _enter_tree() -> void:
     _create_interface()
-    add_control_to_dock(DOCK_SLOT_RIGHT_UL, panel)
+    get_editor_interface().get_editor_main_screen().add_child(main_screen)
     _scan_plugins()
 
 
 func _exit_tree() -> void:
-    if is_instance_valid(panel):
-        remove_control_from_docks(panel)
-        panel.queue_free()
+    if is_instance_valid(main_screen):
+        if main_screen.get_parent() != null:
+            main_screen.get_parent().remove_child(main_screen)
+        main_screen.queue_free()
+
+
+func _has_main_screen() -> bool:
+    return true
+
+
+func _get_plugin_name() -> String:
+    return "插件工厂"
+
+
+func _get_plugin_icon() -> Texture2D:
+    return get_editor_interface().get_editor_theme().get_icon("Node", "EditorIcons")
+
+
+func _make_visible(visible: bool) -> void:
+    if is_instance_valid(main_screen):
+        main_screen.visible = visible
 
 
 func _create_interface() -> void:
+    main_screen = ScrollContainer.new()
+    main_screen.name = "插件工厂页面"
+    main_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    main_screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    main_screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    main_screen.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+
     panel = VBoxContainer.new()
-    panel.name = "插件工厂"
-    panel.custom_minimum_size = Vector2(340, 560)
+    panel.name = "插件工厂内容"
+    panel.custom_minimum_size = Vector2(420, 620)
+    panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    main_screen.add_child(panel)
 
     var title := Label.new()
     title.text = "插件工厂 Plugin Factory"
