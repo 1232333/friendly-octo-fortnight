@@ -15,7 +15,7 @@ bash setup.sh
 ```
 
 安装脚本会安装 Python、CMake、Ninja、Clang、Git，并下载适配 Termux ARM64 的
-Android NDK r29（首次下载较大，需要稳定网络和足够存储空间）。
+社区适配的 Android NDK r29（并非 Google 官方 Termux 主机发行包；首次下载较大，需要稳定网络和足够存储空间）。也可以自行设置 `ANDROID_NDK_HOME` 指向兼容的 ARM64 主机 NDK。
 
 4. 启动代理：
 
