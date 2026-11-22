@@ -18,5 +18,21 @@ func _initialize() -> void:
         quit(1)
         return
 
-    print("Plugin Factory 0.4.0 scripts parsed and C++ template found.")
+    var chinese_plugin_script: Variant = load("res://addons/plugin_factory/templates/chinese_programming_language/plugin.gd")
+    if chinese_plugin_script == null:
+        push_error("Chinese programming language plugin GDScript failed to load.")
+        quit(1)
+        return
+
+    if not FileAccess.file_exists("res://addons/plugin_factory/templates/chinese_programming_language/plugin.cfg"):
+        push_error("Chinese programming language plugin.cfg is missing.")
+        quit(1)
+        return
+
+    if not FileAccess.file_exists("res://addons/plugin_factory/templates/chinese_programming_language/chinese_native.gdextension"):
+        push_error("Chinese programming language GDExtension descriptor is missing.")
+        quit(1)
+        return
+
+    print("Plugin Factory and installable Chinese programming language addon scripts parsed.")
     quit(0)
