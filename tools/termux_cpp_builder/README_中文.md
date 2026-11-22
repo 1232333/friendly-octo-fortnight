@@ -23,7 +23,7 @@ Android NDK r29（首次下载较大，需要稳定网络和足够存储空间�
 $HOME/.plugin_factory_builder/start.sh
 ```
 
-5. 保持 Termux 会话运行，切回 Godot，打开“插件工厂”工作区并测试连接。
+5. 保持 Termux 会话运行，复制终端显示的连接密钥。\n6. 切回 Godot，在插件工厂的连接密钥框粘贴一次；密钥会保存在 Godot 的 user:// 数据目录。\n7. 点击测试连接，再执行创建模板、编译和打包。
 
 ## 构建流程
 1. 在 Godot 插件工厂点击“创建 C++ 扩展模板”。
