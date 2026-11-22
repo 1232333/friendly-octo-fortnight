@@ -7,6 +7,8 @@ projects stored in Android shared storage.
 from __future__ import annotations
 
 import json
+import hmac
+import secrets
 import os
 import platform
 import shutil
@@ -20,6 +22,8 @@ from urllib.parse import urlparse
 
 HOST = "127.0.0.1"
 PORT = 8766
+TOKEN_PATH = Path.home() / ".plugin_factory_builder" / "token"
+AUTH_TOKEN = ""
 MAX_BODY = 1024 * 1024
 EXCLUDED_DIRS = {
     ".git", ".godot", ".plugin_factory", "__pycache__", ".pytest_cache",
@@ -244,6 +248,11 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, health())
 
     def do_POST(self) -> None:
+        if not AUTH_TOKEN or not hmac.compare_digest(
+            self.headers.get("X-Plugin-Factory-Token", ""), AUTH_TOKEN
+        ):
+            self._send(403, {"ok": False, "error": "连接密钥无效，请复制 Termux 启动时显示的密钥。"})
+            return
         route = urlparse(self.path).path
         if route not in ("/build", "/package"):
             self._send(404, {"ok": False, "error": "接口不存在"})
@@ -264,7 +273,17 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    global AUTH_TOKEN
+    TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if TOKEN_PATH.is_file():
+        AUTH_TOKEN = TOKEN_PATH.read_text(encoding="utf-8").strip()
+    if not AUTH_TOKEN:
+        AUTH_TOKEN = secrets.token_urlsafe(32)
+        TOKEN_PATH.write_text(AUTH_TOKEN, encoding="utf-8")
+        TOKEN_PATH.chmod(0o600)
     print("Plugin Factory Termux C++ Builder 0.1.0", flush=True)
+    print("Godot 连接密钥（只在本机使用，请勿分享）：", flush=True)
+    print(AUTH_TOKEN, flush=True)
     print(f"Listening only on http://{HOST}:{PORT}", flush=True)
     print("Keep this Termux session alive while Godot is building.", flush=True)
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
