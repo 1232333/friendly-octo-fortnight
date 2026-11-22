@@ -135,8 +135,11 @@ def health() -> dict:
 def build_cpp(project: Path, payload: dict) -> dict:
     source = project / "cpp"
     cmake_file = source / "CMakeLists.txt"
+    addon = project / "addons" / "chinese_programming_language"
     if not cmake_file.is_file():
-        raise ValueError("项目缺少 cpp/CMakeLists.txt。请先点击“创建 C++ 扩展模板”。")
+        raise ValueError("项目缺少 cpp/CMakeLists.txt。请先在插件工厂点击“创建中文编程插件”。")
+    if not (addon / "plugin.cfg").is_file() or not (addon / "chinese_native.gdextension").is_file():
+        raise ValueError("缺少 addons/chinese_programming_language 插件封装，请重新点击“创建中文编程插件”。")
 
     compiler_target = tool_version(["clang++", "-dumpmachine"]) or ""
     if "android" not in compiler_target.lower():
@@ -188,14 +191,44 @@ def build_cpp(project: Path, payload: dict) -> dict:
             "error": "编译命令成功，但没有找到 libchinese_native.so",
             "log": str(log_file),
         }
-    output = project / "bin" / "native"
+    output = project / "addons" / "chinese_programming_language" / "bin" / "android"
     output.mkdir(parents=True, exist_ok=True)
     target = output / "libchinese_native.so"
     shutil.copy2(candidates[0], target)
     return {
         "ok": True, "stage": "complete", "library": str(target),
         "size_bytes": target.stat().st_size, "log": str(log_file),
-        "message": "Android ARM64 GDExtension 编译完成",
+        "message": "中文编程语言 Android ARM64 GDExtension 已安装到 Godot 插件目录",
+    }
+
+
+def package_chinese_plugin(project: Path) -> dict:
+    addon = project / "addons" / "chinese_programming_language"
+    descriptor = addon / "chinese_native.gdextension"
+    plugin_cfg = addon / "plugin.cfg"
+    library = addon / "bin" / "android" / "libchinese_native.so"
+    for required in (plugin_cfg, descriptor, addon / "plugin.gd", library):
+        if not required.is_file():
+            raise ValueError("中文编程插件尚未准备完整，缺少文件：" + str(required.relative_to(project)))
+
+    dist = project / "dist"
+    dist.mkdir(exist_ok=True)
+    output = dist / "ChineseProgrammingLanguage-Android-ARM64.zip"
+    temp = output.with_suffix(".zip.tmp")
+    file_count = 0
+    with zipfile.ZipFile(temp, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
+        for current, dirs, files in os.walk(addon):
+            dirs[:] = sorted(d for d in dirs if d not in EXCLUDED_DIRS)
+            for filename in sorted(files):
+                path = Path(current) / filename
+                relative = path.relative_to(project)
+                archive.write(path, relative.as_posix())
+                file_count += 1
+    temp.replace(output)
+    return {
+        "ok": True, "package": str(output), "size_bytes": output.stat().st_size,
+        "file_count": file_count,
+        "message": "可安装到 Godot 的中文编程语言 Android ARM64 插件 ZIP 已生成",
     }
 
 
@@ -254,7 +287,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(403, {"ok": False, "error": "连接密钥无效，请复制 Termux 启动时显示的密钥。"})
             return
         route = urlparse(self.path).path
-        if route not in ("/build", "/package"):
+        if route not in ("/build", "/package", "/package_plugin"):
             self._send(404, {"ok": False, "error": "接口不存在"})
             return
         try:
@@ -263,7 +296,12 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("请求数据为空或超过大小限制")
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             project = resolve_project(str(payload.get("project_dir", "")))
-            result = build_cpp(project, payload) if route == "/build" else package_project(project)
+            if route == "/build":
+                result = build_cpp(project, payload)
+            elif route == "/package_plugin":
+                result = package_chinese_plugin(project)
+            else:
+                result = package_project(project)
             self._send(200 if result.get("ok") else 500, result)
         except (ValueError, OSError, json.JSONDecodeError) as error:
             self._send(400, {"ok": False, "error": str(error)})

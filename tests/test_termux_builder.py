@@ -31,6 +31,38 @@ class BuilderTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     builder.resolve_project(str(project))
 
+    def test_package_chinese_plugin_requires_android_binary_and_packages_addon_root(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary) / "MyGame"
+            addon = project / "addons" / "chinese_programming_language"
+            binary = addon / "bin" / "android" / "libchinese_native.so"
+            binary.parent.mkdir(parents=True)
+            project.mkdir(exist_ok=True)
+            (project / "project.godot").write_text("config_version=5\n", encoding="utf-8")
+            (addon / "plugin.cfg").write_text('[plugin]\nscript="plugin.gd"\n', encoding="utf-8")
+            (addon / "plugin.gd").write_text("@tool\nextends EditorPlugin\n", encoding="utf-8")
+            (addon / "chinese_native.gdextension").write_text('[configuration]\n', encoding="utf-8")
+            binary.write_bytes(b"android-arm64-library")
+            result = builder.package_chinese_plugin(project)
+            self.assertTrue(result["ok"])
+            with zipfile.ZipFile(result["package"]) as archive:
+                names = set(archive.namelist())
+            self.assertIn("addons/chinese_programming_language/plugin.cfg", names)
+            self.assertIn("addons/chinese_programming_language/plugin.gd", names)
+            self.assertIn("addons/chinese_programming_language/chinese_native.gdextension", names)
+            self.assertIn("addons/chinese_programming_language/bin/android/libchinese_native.so", names)
+
+    def test_package_chinese_plugin_fails_without_android_binary(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary) / "MyGame"
+            addon = project / "addons" / "chinese_programming_language"
+            addon.mkdir(parents=True)
+            (addon / "plugin.cfg").write_text("[plugin]\n", encoding="utf-8")
+            (addon / "plugin.gd").write_text("@tool\n", encoding="utf-8")
+            (addon / "chinese_native.gdextension").write_text("[configuration]\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                builder.package_chinese_plugin(project)
+
     def test_package_excludes_editor_cache_and_git(self):
         with tempfile.TemporaryDirectory() as temporary:
             project = Path(temporary) / "MyGame"
