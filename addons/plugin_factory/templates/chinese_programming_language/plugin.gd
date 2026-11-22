@@ -94,7 +94,7 @@ func _compile_source() -> void:
         return
 
     var result: Variant = compiler.call("compile", source_editor.text)
-    compiler.free()
+    compiler = null
     if not (result is Dictionary):
         status_label.text = "编译器返回格式错误"
         return
