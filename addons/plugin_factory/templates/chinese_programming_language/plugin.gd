@@ -116,6 +116,6 @@ func _compile_source() -> void:
     out.close()
     var execution: Dictionary = compiler.call("run", bytecode, get_editor_interface().get_edited_scene_root())
     output_editor.text = str(execution.get("output", "")) + ("" if bool(execution.get("ok", false)) else str(execution.get("error", "执行失败")))
-    status_label.text = "原生编译并执行成功 · ZHBC v1 · %d 字节" % bytecode.size() if bool(execution.get("ok", false)) else "VM 执行失败"
+    status_label.text = "原生编译并执行成功 · ZHBC v2 · %d 字节" % bytecode.size() if bool(execution.get("ok", false)) else "VM 执行失败"
     compiler = null
     get_editor_interface().get_resource_filesystem().scan()
