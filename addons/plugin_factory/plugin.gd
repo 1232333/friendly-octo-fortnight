@@ -1,7 +1,7 @@
 @tool
 extends EditorPlugin
 
-const FACTORY_VERSION := "0.4.0"
+const FACTORY_VERSION := "0.5.0"
 const PluginImporter = preload("res://addons/plugin_factory/importer.gd")
 const OUTPUT_PATH := "user://PluginFactory_Output.zip"
 const PROFILE_PATH := "user://PluginFactory/profiles.json"
