@@ -112,22 +112,27 @@ def health() -> dict:
     target = tool_version(["clang++", "-dumpmachine"]) if versions["clang"] else None
     required = all(versions[name] for name in ("clang", "cmake", "ninja", "git"))
     ndk_root = os.environ.get("ANDROID_NDK_HOME") or os.environ.get("ANDROID_NDK_ROOT", "")
-    toolchain = Path(ndk_root) / "build" / "cmake" / "android.toolchain.cmake" if ndk_root else None
-    ndk_ready = bool(toolchain and toolchain.is_file())
+    ndk_sysroot = (
+        Path(ndk_root) / "toolchains" / "llvm" / "prebuilt" / "linux-aarch64" / "sysroot"
+        if ndk_root else None
+    )
+    ndk_ready = bool(ndk_sysroot and (ndk_sysroot / "usr" / "include" / "stdint.h").is_file())
     android_target = bool(target and "android" in target.lower())
+    arm64_device = platform.machine() in ("aarch64", "arm64")
+    ready = required and arm64_device and android_target and ndk_ready
     return {
-        "ok": required and platform.machine() in ("aarch64", "arm64") and android_target and ndk_ready,
+        "ok": ready,
         "service": "Plugin Factory Termux C++ Builder",
-        "version": "0.1.0",
+        "version": "0.1.1",
         "port": PORT,
         "versions": versions,
         "clang_target": target,
         "android_ndk_home": str(ndk_root) if ndk_root else "",
-        "ndk_toolchain_ready": ndk_ready,
+        "ndk_sysroot_ready": ndk_ready,
         "message": (
-            "Termux Android ARM64 编译环境就绪"
-            if required and android_target and ndk_ready
-            else "请安装 Termux clang、CMake、Ninja、Git，并完成 Android NDK 安装（ANDROID_NDK_HOME）"
+            "Termux 原生 Clang + Android NDK sysroot 编译环境就绪"
+            if ready
+            else "请检查 Termux 原生 clang、CMake、Ninja、Git，以及 Android NDK sysroot。"
         ),
     }
 
@@ -152,22 +157,40 @@ def build_cpp(project: Path, payload: dict) -> dict:
         raise ValueError("当前设备不是 ARM64，不能生成 Android ARM64 扩展。")
 
     ndk_root = os.environ.get("ANDROID_NDK_HOME") or os.environ.get("ANDROID_NDK_ROOT", "")
-    toolchain = Path(ndk_root) / "build" / "cmake" / "android.toolchain.cmake" if ndk_root else None
-    if not toolchain or not toolchain.is_file():
-        raise ValueError("找不到 Android NDK CMake 工具链。请重新运行 Termux 安装脚本。")
+    ndk_sysroot = (
+        Path(ndk_root) / "toolchains" / "llvm" / "prebuilt" / "linux-aarch64" / "sysroot"
+        if ndk_root else None
+    )
+    if not ndk_sysroot or not (ndk_sysroot / "usr" / "include" / "stdint.h").is_file():
+        raise ValueError("找不到 Android NDK ARM64 sysroot。请重新运行 Termux 安装脚本。")
 
     cmake = shutil.which("cmake")
     ninja = shutil.which("ninja")
-    if not cmake or not ninja:
-        raise ValueError("缺少 CMake 或 Ninja，请运行 Termux 安装脚本。")
+    clang = shutil.which("clang")
+    clangxx = shutil.which("clang++")
+    if not cmake or not ninja or not clang or not clangxx:
+        raise ValueError("缺少 Termux 原生 Clang、CMake 或 Ninja，请运行 Termux 安装脚本。")
 
     build_dir = project / ".plugin_factory" / "cpp-build"
     log_file = project / ".plugin_factory" / "cpp-build.log"
     jobs = max(1, min(int(payload.get("jobs", 2)), 4))
+    # Do not execute the NDK's prebuilt host clang: Android's bionic loader
+    # cannot run that Linux host ELF binary. Use Termux's native Clang driver
+    # and the NDK headers/libraries as the target sysroot instead.
+    if build_dir.exists():
+        shutil.rmtree(build_dir)
+    target_triple = "aarch64-linux-android24"
     configure = [
         cmake, "-S", str(source), "-B", str(build_dir), "-G", "Ninja",
-        "--toolchain", str(toolchain),
+        "-DCMAKE_C_COMPILER=" + clang,
+        "-DCMAKE_CXX_COMPILER=" + clangxx,
+        "-DCMAKE_C_COMPILER_TARGET=" + target_triple,
+        "-DCMAKE_CXX_COMPILER_TARGET=" + target_triple,
+        "-DCMAKE_SYSROOT=" + str(ndk_sysroot),
         "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
+        "-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld",
+        "-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld",
         "-DANDROID_ABI=arm64-v8a",
         "-DANDROID_PLATFORM=android-24",
         "-DANDROID_STL=c++_static",
