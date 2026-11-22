@@ -11,6 +11,7 @@ void initialize_chinese_native(ModuleInitializationLevel level) {
     }
     ClassDB::register_class<HelloNative>();
     ClassDB::register_class<ChineseLanguage>();
+    ClassDB::register_class<ChineseProgram>();
 }
 
 void uninitialize_chinese_native(ModuleInitializationLevel level) {
