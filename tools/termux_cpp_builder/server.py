@@ -65,7 +65,7 @@ def run_command(command: list[str], cwd: Path, log_file: Path, timeout: int = 36
     log_file.parent.mkdir(parents=True, exist_ok=True)
     started = time.time()
     with log_file.open("w", encoding="utf-8") as log:
-        log.write("$ " + " ".join(command) + "\\n\\n")
+        log.write("$ " + " ".join(command) + "\n\n")
         log.flush()
         try:
             completed = subprocess.run(
@@ -74,10 +74,10 @@ def run_command(command: list[str], cwd: Path, log_file: Path, timeout: int = 36
             )
             code = completed.returncode
         except subprocess.TimeoutExpired:
-            log.write("\\nERROR: command timed out after %d seconds\\n" % timeout)
+            log.write("\nERROR: command timed out after %d seconds\n" % timeout)
             return {"ok": False, "exit_code": -1, "error": "构建超时", "log": str(log_file)}
         except OSError as error:
-            log.write("\\nERROR: %s\\n" % error)
+            log.write("\nERROR: %s\n" % error)
             return {"ok": False, "exit_code": -1, "error": str(error), "log": str(log_file)}
     return {
         "ok": code == 0,
