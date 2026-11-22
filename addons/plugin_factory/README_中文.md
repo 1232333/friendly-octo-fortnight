@@ -44,11 +44,11 @@ conflicts=["incompatible_addon_folder"]
 ## 兼容与限制
 - 目标环境：Godot 4.7.2；当前包面向 Android ARM64 编辑器项目。
 - 依赖/冲突以插件目录名为标识，且需要在 `[plugin_factory]` 中主动声明。
-- 当前版本负责 GDScript 插件的发现、组合和打包；尚未执行 C++ 编译，也不会自动安装生成的组合包。
+- 插件管理继续负责 GDScript 插件发现、组合与插件包打包；C++ 编译由独立 Termux 代理执行。
 - C++ 编译通过 Termux 原生 Android ARM64 clang 执行；首次构建需联网下载 godot-cpp。
 - 当前项目 ZIP 不是 APK；APK 导出仍需 Android 导出模板、SDK/NDK、JDK 和签名配置。
 - godot-cpp 当前以 4.5 API 为兼容基线，目标 Godot 运行环境为 4.7.2。
-- GitHub Actions 会检查插件结构、关键 API 标记和 ZIP 完整性；这不等同于 Godot 编辑器语法解析或 Android 真机测试。
+- GitHub Actions 会解析 Godot 插件脚本、运行代理单元测试，并在 Linux CI 编译 C++ 示例扩展；这不等同于 Termux Android ARM64 真机编译或 Android 编辑器加载验证。
 
 ## Termux 编译代理安装
 参阅 `tools/termux_cpp_builder/README_中文.md`，在原生 Termux 执行 `bash setup.sh`，然后运行 `$HOME/.plugin_factory_builder/start.sh`。回到 Godot 插件工厂，先测试连接，再创建 C++ 模板、编译和打包。
