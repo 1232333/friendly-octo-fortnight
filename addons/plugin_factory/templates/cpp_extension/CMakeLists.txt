@@ -27,6 +27,6 @@ endif()
 
 set_target_properties(chinese_native PROPERTIES
     OUTPUT_NAME "chinese_native"
-    LIBRARY_OUTPUT_DIRECTORY "\${CMAKE_BINARY_DIR}/output"
-    RUNTIME_OUTPUT_DIRECTORY "\${CMAKE_BINARY_DIR}/output"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/output"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/output"
 )
