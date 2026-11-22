@@ -17,6 +17,9 @@ int main(){
  auto fn_bytes=fn_compiled.bytecode.encode();chinese::Bytecode fn_decoded;require(chinese::Bytecode::decode(fn_bytes,fn_decoded,err),"decode function bytecode");require(fn_decoded.functions.size()==1,"function table serialized");auto fn_result=vm.run(fn_decoded);require(fn_result.ok,"VM executes native function call");require(fn_result.output=="42\n","function returns value to caller");
  auto bad_fn_args=f.compile("函数 求和(a: 整数) -> 整数:\n返回 a\n结束\n打印(求和(1, 2))\n");require(!bad_fn_args.ok,"function argument count checked");
  auto bad_fn_type=f.compile("函数 求和(a: 整数) -> 整数:\n返回 a\n结束\n打印(求和(\"文字\"))\n");require(!bad_fn_type.ok,"function argument type checked");
+ auto forward=f.compile("函数 先调用() -> 整数:\n返回 后续(41)\n结束\n函数 后续(x: 整数) -> 整数:\n返回 x + 1\n结束\n打印(先调用())\n");require(forward.ok,"forward function call compiles");auto forward_result=vm.run(forward.bytecode);require(forward_result.ok&&forward_result.output=="42\n","forward function call executes");
+ auto missing_return=f.compile("函数 不完整(x: 整数) -> 整数:\n如果 x > 0:\n返回 x\n结束\n结束\n");require(!missing_return.ok,"non-void function must return on every path");
+ auto both_return=f.compile("函数 取值(x: 整数) -> 整数:\n如果 x > 0:\n返回 x\n否则:\n返回 0\n结束\n结束\n打印(取值(9))\n");require(both_return.ok,"both conditional branches return");auto both_result=vm.run(both_return.bytecode);require(both_result.ok&&both_result.output=="9\n","conditional return execution");
  auto wrong_integer=f.compile("变量 生命值: 整数 = \"满血\"\n");require(!wrong_integer.ok,"string cannot initialize integer");
  auto wrong_type=f.compile("变量 标记: 颜色 = 3\n");require(!wrong_type.ok,"unknown type name rejected");
  auto wrong_math=f.compile("变量 结果 = \"文字\" - 2\n");require(!wrong_math.ok,"invalid arithmetic types rejected");
