@@ -1,7 +1,7 @@
 @tool
 extends EditorPlugin
 
-const FACTORY_VERSION := "0.3.1"
+const FACTORY_VERSION := "0.4.0"
 const PluginImporter = preload("res://addons/plugin_factory/importer.gd")
 const OUTPUT_PATH := "user://PluginFactory_Output.zip"
 const PROFILE_PATH := "user://PluginFactory/profiles.json"
@@ -18,6 +18,9 @@ var profile_name_input: LineEdit
 var profile_selector: OptionButton
 var folder_dialog: FileDialog
 var zip_dialog: FileDialog
+var builder_request: HTTPRequest
+var builder_status_label: Label
+var builder_action := ""
 var discovered_plugins: Array[Dictionary] = []
 var visible_plugins: Array[Dictionary] = []
 var saved_profiles: Array[Dictionary] = []
@@ -181,6 +184,59 @@ func _create_interface() -> void:
     delete_profile_button.custom_minimum_size = Vector2(0, 42)
     delete_profile_button.pressed.connect(_delete_profile)
     profile_buttons.add_child(delete_profile_button)
+
+    var cpp_title := Label.new()
+    cpp_title.text = "C++ 编译与项目打包（Termux）"
+    panel.add_child(cpp_title)
+
+    var cpp_help := Label.new()
+    cpp_help.text = "先在 Termux 安装并启动本地编译代理，再从这里创建模板、编译 Android ARM64 扩展和打包项目。"
+    cpp_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    panel.add_child(cpp_help)
+
+    var cpp_row_one := HBoxContainer.new()
+    panel.add_child(cpp_row_one)
+
+    var connection_button := Button.new()
+    connection_button.text = "测试 Termux 连接"
+    connection_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    connection_button.custom_minimum_size = Vector2(0, 44)
+    connection_button.pressed.connect(_test_termux_connection)
+    cpp_row_one.add_child(connection_button)
+
+    var template_button := Button.new()
+    template_button.text = "创建 C++ 扩展模板"
+    template_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    template_button.custom_minimum_size = Vector2(0, 44)
+    template_button.pressed.connect(_create_cpp_starter)
+    cpp_row_one.add_child(template_button)
+
+    var cpp_row_two := HBoxContainer.new()
+    panel.add_child(cpp_row_two)
+
+    var build_button := Button.new()
+    build_button.text = "编译 C++ 扩展"
+    build_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    build_button.custom_minimum_size = Vector2(0, 48)
+    build_button.pressed.connect(_build_cpp_extension)
+    cpp_row_two.add_child(build_button)
+
+    var package_button := Button.new()
+    package_button.text = "打包整个项目 ZIP"
+    package_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    package_button.custom_minimum_size = Vector2(0, 48)
+    package_button.pressed.connect(_package_project)
+    cpp_row_two.add_child(package_button)
+
+    builder_status_label = Label.new()
+    builder_status_label.text = "Termux 编译代理：尚未连接（127.0.0.1:8766）"
+    builder_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    panel.add_child(builder_status_label)
+
+    builder_request = HTTPRequest.new()
+    builder_request.timeout = 900.0
+    builder_request.request_completed.connect(_on_builder_request_completed)
+    add_child(builder_request)
 
     var details_title := Label.new()
     details_title.text = "插件详情"
@@ -748,3 +804,155 @@ func _run_import(result: Dictionary, source_type: String) -> void:
     else:
         _scan_plugins()
         status_label.text = "%s 导入完成：%d 个插件" % [source_type, imported.size()]
+
+
+
+func _test_termux_connection() -> void:
+    _request_builder("/health", "health", HTTPClient.METHOD_GET)
+
+
+func _build_cpp_extension() -> void:
+    _request_builder("/build", "build", HTTPClient.METHOD_POST)
+
+
+func _package_project() -> void:
+    _request_builder("/package", "package", HTTPClient.METHOD_POST)
+
+
+func _request_builder(endpoint: String, action: String, method: int) -> void:
+    if not is_instance_valid(builder_request):
+        builder_status_label.text = "编译请求组件尚未初始化"
+        return
+    if builder_request.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
+        builder_status_label.text = "已有构建请求正在执行，请稍候"
+        return
+
+    builder_action = action
+    builder_status_label.text = "正在连接 Termux 编译代理……"
+    var url := "http://127.0.0.1:8766" + endpoint
+    var headers := PackedStringArray()
+    var body := ""
+    if method == HTTPClient.METHOD_POST:
+        headers.append("Content-Type: application/json")
+        body = JSON.stringify({
+            "project_dir": ProjectSettings.globalize_path("res://").trim_suffix("/"),
+            "jobs": 2
+        })
+
+    var error := builder_request.request(url, headers, method, body)
+    if error != OK:
+        builder_status_label.text = "无法发送请求，错误码：%d。请确认 Termux 服务已启动。" % error
+        _log("Termux 请求创建失败，错误码：" + str(error))
+
+
+func _on_builder_request_completed(
+    result: int,
+    response_code: int,
+    _headers: PackedStringArray,
+    body: PackedByteArray
+) -> void:
+    var response_text := body.get_string_from_utf8()
+    var parsed: Variant = JSON.parse_string(response_text)
+    if result != HTTPRequest.RESULT_SUCCESS:
+        builder_status_label.text = "连接失败。请在 Termux 启动编译代理，并确认 Godot 与 Termux 位于同一设备。"
+        _log("Termux HTTP 请求失败，结果码：" + str(result))
+        return
+
+    if not (parsed is Dictionary):
+        builder_status_label.text = "编译代理返回了无法识别的数据"
+        _log(response_text)
+        return
+
+    var data: Dictionary = parsed
+    var ok := bool(data.get("ok", false))
+    if builder_action == "health":
+        var versions: Dictionary = data.get("versions", {})
+        builder_status_label.text = str(data.get("message", "已收到响应"))
+        _log("Termux 连接：" + str(data.get("message", "")))
+        _log("clang：" + str(versions.get("clang", "未安装")))
+        _log("CMake：" + str(versions.get("cmake", "未安装")))
+        _log("Ninja：" + str(versions.get("ninja", "未安装")))
+        _log("clang 目标：" + str(data.get("clang_target", "未知")))
+        if not ok:
+            builder_status_label.text += "（环境未就绪）"
+        return
+
+    if not ok or response_code < 200 or response_code >= 300:
+        var failure := str(data.get("error", data.get("message", "操作失败")))
+        builder_status_label.text = "操作失败：" + failure
+        _log("Termux 操作失败：" + failure)
+        if data.has("log"):
+            _log("构建日志：" + str(data["log"]))
+        return
+
+    if builder_action == "build":
+        builder_status_label.text = "C++ 编译完成：" + str(data.get("library", ""))
+        _log("Android ARM64 动态库已生成：" + str(data.get("library", "")))
+        _log("动态库大小：" + str(data.get("size_bytes", 0)) + " bytes")
+    elif builder_action == "package":
+        builder_status_label.text = "项目 ZIP 已生成：" + str(data.get("package", ""))
+        _log("项目打包完成：" + str(data.get("package", "")))
+        _log("打包文件数：" + str(data.get("file_count", 0)))
+    builder_action = ""
+
+
+func _create_cpp_starter() -> void:
+    var project_root := ProjectSettings.globalize_path("res://")
+    var cpp_root := project_root.path_join("cpp")
+    var extension_file := project_root.path_join("chinese_native.gdextension")
+    if DirAccess.dir_exists_absolute(cpp_root) or FileAccess.file_exists(extension_file):
+        builder_status_label.text = "项目已有 cpp/ 或 chinese_native.gdextension，为防止覆盖未创建模板"
+        return
+
+    var source_root := "res://addons/plugin_factory/templates/cpp_extension"
+    var copy_error := _copy_template_directory(source_root, cpp_root)
+    if not copy_error.is_empty():
+        builder_status_label.text = "创建模板失败：" + copy_error
+        return
+
+    var extension_source := source_root.path_join("chinese_native.gdextension")
+    var extension_error := DirAccess.copy_absolute(
+        ProjectSettings.globalize_path(extension_source),
+        extension_file
+    )
+    if extension_error != OK:
+        builder_status_label.text = "模板已复制，但扩展声明文件复制失败：" + str(extension_error)
+        return
+
+    builder_status_label.text = "C++ 模板已创建。现在先测试 Termux 连接，再点击编译。"
+    _log("已创建 cpp/、chinese_native.gdextension 和 C++ 示例类")
+
+
+func _copy_template_directory(source: String, destination: String) -> String:
+    var absolute_source := ProjectSettings.globalize_path(source)
+    var make_error := DirAccess.make_dir_recursive_absolute(destination)
+    if make_error != OK and make_error != ERR_ALREADY_EXISTS:
+        return "无法创建目录（%d）" % make_error
+
+    var dir := DirAccess.open(absolute_source)
+    if dir == null:
+        return "无法读取内置 C++ 模板目录"
+    dir.list_dir_begin()
+    var entry := dir.get_next()
+    while not entry.is_empty():
+        if entry == "." or entry == "..":
+            entry = dir.get_next()
+            continue
+        var source_path := absolute_source.path_join(entry)
+        var destination_path := destination.path_join(entry)
+        if dir.current_is_dir():
+            var nested_error := _copy_template_directory(
+                source.path_join(entry),
+                destination_path
+            )
+            if not nested_error.is_empty():
+                dir.list_dir_end()
+                return nested_error
+        else:
+            var copy_error := DirAccess.copy_absolute(source_path, destination_path)
+            if copy_error != OK:
+                dir.list_dir_end()
+                return "复制文件失败：%s（%d）" % [entry, copy_error]
+        entry = dir.get_next()
+    dir.list_dir_end()
+    return ""
