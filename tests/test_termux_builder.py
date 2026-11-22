@@ -31,6 +31,42 @@ class BuilderTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     builder.resolve_project(str(project))
 
+
+    def test_build_uses_termux_clang_and_ndk_sysroot_not_ndk_host_binary(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary) / "MyGame"
+            source = project / "cpp"
+            addon = project / "addons" / "chinese_programming_language"
+            sysroot = Path(temporary) / "ndk" / "toolchains" / "llvm" / "prebuilt" / "linux-aarch64" / "sysroot"
+            (source).mkdir(parents=True)
+            addon.mkdir(parents=True)
+            (sysroot / "usr" / "include").mkdir(parents=True)
+            (sysroot / "usr" / "include" / "stdint.h").write_text("/* test */", encoding="utf-8")
+            (source / "CMakeLists.txt").write_text("project(test)", encoding="utf-8")
+            (addon / "plugin.cfg").write_text("[plugin]", encoding="utf-8")
+            (addon / "chinese_native.gdextension").write_text("[configuration]", encoding="utf-8")
+            with patch.object(builder, "tool_version", return_value="aarch64-unknown-linux-android"), \\
+                 patch.object(builder.platform, "machine", return_value="aarch64"), \\
+                 patch.object(builder.shutil, "which", side_effect=lambda name: f"/termux/bin/{name}"), \\
+                 patch.dict(builder.os.environ, {"ANDROID_NDK_HOME": str(sysroot.parents[3])}, clear=False):
+                commands = []
+                def fake_run(command, cwd, log_file, timeout=3600):
+                    commands.append(command)
+                    if len(commands) == 2:
+                        output = project / ".plugin_factory" / "cpp-build" / "output"
+                        output.mkdir(parents=True, exist_ok=True)
+                        (output / "libchinese_native.so").write_bytes(b"fake-arm64-so")
+                    return {"ok": True, "exit_code": 0, "log": str(log_file)}
+                with patch.object(builder, "run_command", side_effect=fake_run):
+                    result = builder.build_cpp(project, {"jobs": 2})
+            self.assertTrue(result["ok"])
+            configure = commands[0]
+            self.assertNotIn("--toolchain", configure)
+            self.assertIn("-DCMAKE_C_COMPILER=/termux/bin/clang", configure)
+            self.assertIn("-DCMAKE_CXX_COMPILER=/termux/bin/clang++", configure)
+            self.assertIn("-DCMAKE_CXX_COMPILER_TARGET=aarch64-linux-android24", configure)
+            self.assertIn("-DCMAKE_SYSROOT=" + str(sysroot), configure)
+
     def test_package_chinese_plugin_requires_android_binary_and_packages_addon_root(self):
         with tempfile.TemporaryDirectory() as temporary:
             project = Path(temporary) / "MyGame"
