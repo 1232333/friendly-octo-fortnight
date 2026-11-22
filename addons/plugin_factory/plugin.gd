@@ -20,6 +20,7 @@ var folder_dialog: FileDialog
 var zip_dialog: FileDialog
 var builder_request: HTTPRequest
 var builder_status_label: Label
+var builder_token_input: LineEdit
 var builder_action := ""
 var discovered_plugins: Array[Dictionary] = []
 var visible_plugins: Array[Dictionary] = []
@@ -28,6 +29,7 @@ var saved_profiles: Array[Dictionary] = []
 
 func _enter_tree() -> void:
     _create_interface()
+    _load_builder_token()
     get_editor_interface().get_editor_main_screen().add_child(main_screen)
     saved_profiles = _read_profiles()
     _refresh_profile_selector()
@@ -227,6 +229,11 @@ func _create_interface() -> void:
     package_button.custom_minimum_size = Vector2(0, 48)
     package_button.pressed.connect(_package_project)
     cpp_row_two.add_child(package_button)
+
+    builder_token_input = LineEdit.new()
+    builder_token_input.placeholder_text = "粘贴 Termux 启动时显示的本机连接密钥"
+    builder_token_input.secret = true
+    panel.add_child(builder_token_input)
 
     builder_status_label = Label.new()
     builder_status_label.text = "Termux 编译代理：尚未连接（127.0.0.1:8766）"
@@ -834,7 +841,13 @@ func _request_builder(endpoint: String, action: String, method: int) -> void:
     var headers := PackedStringArray()
     var body := ""
     if method == HTTPClient.METHOD_POST:
+        var token := builder_token_input.text.strip_edges()
+        if token.is_empty():
+            builder_status_label.text = "请先粘贴 Termux 启动时显示的连接密钥"
+            return
         headers.append("Content-Type: application/json")
+        headers.append("X-Plugin-Factory-Token: " + token)
+        _save_builder_token(token)
         body = JSON.stringify({
             "project_dir": ProjectSettings.globalize_path("res://").trim_suffix("/"),
             "jobs": 2
@@ -969,3 +982,24 @@ func _install_gdextension_descriptor() -> String:
     if error != OK:
         return "无法复制 chinese_native.gdextension（错误码 %d）" % error
     return ""
+
+
+
+func _load_builder_token() -> void:
+    if not FileAccess.file_exists("user://PluginFactory/termux_token.txt"):
+        return
+    var file := FileAccess.open("user://PluginFactory/termux_token.txt", FileAccess.READ)
+    if file != null:
+        builder_token_input.text = file.get_as_text().strip_edges()
+        file.close()
+
+
+func _save_builder_token(token: String) -> void:
+    var directory := ProjectSettings.globalize_path("user://PluginFactory")
+    var make_error := DirAccess.make_dir_recursive_absolute(directory)
+    if make_error != OK and make_error != ERR_ALREADY_EXISTS:
+        return
+    var file := FileAccess.open("user://PluginFactory/termux_token.txt", FileAccess.WRITE)
+    if file != null:
+        file.store_string(token)
+        file.close()
