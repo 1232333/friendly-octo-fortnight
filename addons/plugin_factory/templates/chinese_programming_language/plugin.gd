@@ -48,12 +48,12 @@ func _build_screen() -> void:
     screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
     var title := Label.new()
-    title.text = "中文编程语言 0.1.0"
+    title.text = "中文游戏编程语言 0.2.0"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     screen.add_child(title)
 
     var help := Label.new()
-    help.text = "使用中文编写 .zh 脚本，点击编译后生成 Godot GDScript。"
+    help.text = "先选中场景中的游戏节点，再编写中文事件脚本。编译后会将可执行脚本绑定到该节点。"
     help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     screen.add_child(help)
 
