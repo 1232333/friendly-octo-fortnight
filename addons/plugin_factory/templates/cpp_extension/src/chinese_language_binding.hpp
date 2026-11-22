@@ -11,6 +11,6 @@ protected:
     static void _bind_methods();
 public:
     Dictionary compile(const String &source) const;
-    Dictionary run(const PackedByteArray &bytecode, Node *scene_root) const;
+    Dictionary run(const PackedByteArray &bytecode, Node *scene_root, const String &event_name=String(), double delta=0.0) const;
 };
 }
