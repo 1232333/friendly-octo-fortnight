@@ -84,7 +84,7 @@ class BuilderTests(unittest.TestCase):
                     __import__("subprocess").CompletedProcess([], 0, stdout="", stderr=""),
                 ],
             ) as run:
-                builder.allow_git_directory(checkout)
+                builder.allow_git_directory(checkout, Path(temporary) / "project")
             self.assertEqual(run.call_args_list[0].args[0], [
                 "git", "config", "--global", "--get-all", "safe.directory"
             ])
