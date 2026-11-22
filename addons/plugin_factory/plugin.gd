@@ -185,9 +185,9 @@ func _combine_selected() -> void:
         status_label.text = "依赖不完整，请查看日志"
         return
 
-    var zip := ZIPWriter.new()
+    var zip: ZIPPacker = ZIPPacker.new()
     var output_absolute := ProjectSettings.globalize_path(OUTPUT_PATH)
-    var error := zip.open(output_absolute)
+    var error: int = zip.open(output_absolute)
     if error != OK:
         status_label.text = "ZIP 创建失败：" + str(error)
         _log("无法创建输出文件：" + output_absolute)
@@ -216,7 +216,7 @@ func _combine_selected() -> void:
             break
 
     if success:
-        var manifest_error := zip.start_file("plugin_factory_manifest.json")
+        var manifest_error: int = zip.start_file("plugin_factory_manifest.json")
         if manifest_error == OK:
             zip.write_file(JSON.stringify(manifest, "\t").to_utf8_buffer())
             zip.close_file()
@@ -234,7 +234,7 @@ func _combine_selected() -> void:
         status_label.text = "打包失败，请查看日志"
 
 
-func _pack_directory(zip: ZIPWriter, source: String, destination: String) -> bool:
+func _pack_directory(zip: ZIPPacker, source: String, destination: String) -> bool:
     var dir := DirAccess.open(source)
     if dir == null:
         _log("无法打开目录：" + source)
@@ -265,7 +265,7 @@ func _pack_directory(zip: ZIPWriter, source: String, destination: String) -> boo
             var data := file.get_buffer(file.get_length())
             file.close()
 
-            var zip_error := zip.start_file(destination_path.replace("\\", "/"))
+            var zip_error: int = zip.start_file(destination_path.replace("\\", "/"))
             if zip_error != OK:
                 _log("ZIP 写入失败：" + destination_path)
                 dir.list_dir_end()
