@@ -38,10 +38,10 @@ class BuilderTests(unittest.TestCase):
             binary = addon / "bin" / "android" / "libchinese_native.so"
             binary.parent.mkdir(parents=True)
             project.mkdir(exist_ok=True)
-            (project / "project.godot").write_text("config_version=5\\n", encoding="utf-8")
-            (addon / "plugin.cfg").write_text('[plugin]\\nscript="plugin.gd"\\n', encoding="utf-8")
-            (addon / "plugin.gd").write_text("@tool\\nextends EditorPlugin\\n", encoding="utf-8")
-            (addon / "chinese_native.gdextension").write_text('[configuration]\\n', encoding="utf-8")
+            (project / "project.godot").write_text("config_version=5\n", encoding="utf-8")
+            (addon / "plugin.cfg").write_text('[plugin]\nscript="plugin.gd"\n', encoding="utf-8")
+            (addon / "plugin.gd").write_text("@tool\nextends EditorPlugin\n", encoding="utf-8")
+            (addon / "chinese_native.gdextension").write_text('[configuration]\n', encoding="utf-8")
             binary.write_bytes(b"android-arm64-library")
             result = builder.package_chinese_plugin(project)
             self.assertTrue(result["ok"])
@@ -57,9 +57,9 @@ class BuilderTests(unittest.TestCase):
             project = Path(temporary) / "MyGame"
             addon = project / "addons" / "chinese_programming_language"
             addon.mkdir(parents=True)
-            (addon / "plugin.cfg").write_text("[plugin]\\n", encoding="utf-8")
-            (addon / "plugin.gd").write_text("@tool\\n", encoding="utf-8")
-            (addon / "chinese_native.gdextension").write_text("[configuration]\\n", encoding="utf-8")
+            (addon / "plugin.cfg").write_text("[plugin]\n", encoding="utf-8")
+            (addon / "plugin.gd").write_text("@tool\n", encoding="utf-8")
+            (addon / "chinese_native.gdextension").write_text("[configuration]\n", encoding="utf-8")
             with self.assertRaises(ValueError):
                 builder.package_chinese_plugin(project)
 
