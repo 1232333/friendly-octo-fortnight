@@ -9,6 +9,7 @@ on:
     branches:
       - main
       - plugin-factory-bootstrap
+      - feature/native-chinese-bytecode-vm
     paths:
       - "addons/plugin_factory/**"
       - "tests/validate_plugin_factory.gd"
