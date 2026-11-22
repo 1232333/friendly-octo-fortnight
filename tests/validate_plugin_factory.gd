@@ -29,6 +29,17 @@ func _initialize() -> void:
         quit(1)
         return
 
+    var chinese_plugin_config := ConfigFile.new()
+    if chinese_plugin_config.load("res://addons/plugin_factory/templates/chinese_programming_language/plugin.cfg") != OK:
+        push_error("Chinese programming language plugin.cfg is invalid.")
+        quit(1)
+        return
+    var chinese_plugin_description := str(chinese_plugin_config.get_value("plugin", "description", ""))
+    if not chinese_plugin_description.contains("ZHBC") or chinese_plugin_description.contains("GDScript"):
+        push_error("Chinese programming language plugin.cfg still describes the legacy GDScript translator.")
+        quit(1)
+        return
+
     if not FileAccess.file_exists("res://addons/plugin_factory/templates/chinese_programming_language/chinese_native.gdextension"):
         push_error("Chinese programming language GDExtension descriptor is missing.")
         quit(1)

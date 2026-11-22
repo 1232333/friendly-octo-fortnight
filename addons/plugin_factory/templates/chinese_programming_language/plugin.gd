@@ -3,18 +3,16 @@ extends EditorPlugin
 
 const PLUGIN_NAME := "中文编程语言"
 const SOURCE_PATH := "res://scripts/hello.zh"
-const OUTPUT_PATH := "res://generated/hello.gd"
+const BYTECODE_PATH := "res://generated/hello.zhbc"
 
 var screen: VBoxContainer
 var source_editor: TextEdit
 var output_editor: TextEdit
 var status_label: Label
 
-
 func _enter_tree() -> void:
     _build_screen()
     get_editor_interface().get_editor_main_screen().add_child(screen)
-
 
 func _exit_tree() -> void:
     if is_instance_valid(screen):
@@ -22,23 +20,18 @@ func _exit_tree() -> void:
             screen.get_parent().remove_child(screen)
         screen.queue_free()
 
-
 func _has_main_screen() -> bool:
     return true
-
 
 func _get_plugin_name() -> String:
     return PLUGIN_NAME
 
-
 func _get_plugin_icon() -> Texture2D:
     return get_editor_interface().get_editor_theme().get_icon("Script", "EditorIcons")
-
 
 func _make_visible(visible: bool) -> void:
     if is_instance_valid(screen):
         screen.visible = visible
-
 
 func _build_screen() -> void:
     screen = VBoxContainer.new()
@@ -46,115 +39,98 @@ func _build_screen() -> void:
     screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
-
     var title := Label.new()
-    title.text = "中文游戏编程语言 0.2.0"
+    title.text = "中文原生编程语言 0.4.0 · ZHBC VM"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     screen.add_child(title)
-
     var help := Label.new()
-    help.text = "先选中场景中的游戏节点，再编写中文事件脚本。编译后会将可执行脚本绑定到该节点。"
+    help.text = "中文源码会编译为独立 .zhbc 字节码，由 C++ 虚拟机执行；不会生成 GDScript。"
     help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     screen.add_child(help)
-
     source_editor = TextEdit.new()
     source_editor.size_flags_vertical = Control.SIZE_EXPAND_FILL
     source_editor.custom_minimum_size = Vector2(0, 220)
-    source_editor.placeholder_text = "在这里输入中文程序……"
-    source_editor.text = "变量 分数 = 80\n打印(分数)\n\n如果 分数 >= 60:\n    打印(\"及格\")\n否则:\n    打印(\"不及格\")\n结束\n"
+    source_editor.placeholder_text = "输入中文程序……"
+    source_editor.text = _load_initial_source()
     screen.add_child(source_editor)
-
     var compile_button := Button.new()
-    compile_button.text = "编译并绑定到选中节点"
+    compile_button.text = "编译并运行（原生 VM）"
     compile_button.custom_minimum_size = Vector2(0, 48)
     compile_button.pressed.connect(_compile_source)
     screen.add_child(compile_button)
-
     status_label = Label.new()
     status_label.text = "等待编译"
     status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     screen.add_child(status_label)
-
     output_editor = TextEdit.new()
     output_editor.editable = false
     output_editor.size_flags_vertical = Control.SIZE_EXPAND_FILL
     output_editor.custom_minimum_size = Vector2(0, 180)
-    output_editor.placeholder_text = "编译后的 GDScript 将显示在这里"
+    output_editor.placeholder_text = "VM 执行输出 / 错误"
     screen.add_child(output_editor)
+
+func _load_initial_source() -> String:
+    if FileAccess.file_exists(SOURCE_PATH):
+        var file := FileAccess.open(SOURCE_PATH, FileAccess.READ)
+        if file != null:
+            var saved_source := file.get_as_text()
+            file.close()
+            return saved_source
+    return "变量 分数: 整数 = 80\n打印(\"分数：\", 分数)\n如果 分数 >= 60:\n    打印(\"及格\")\n否则:\n    打印(\"不及格\")\n结束\n"
 
 
 func _compile_source() -> void:
     if not ClassDB.class_exists("ChineseLanguage"):
-        status_label.text = "C++ 编译器尚未加载。请先在插件工厂编译 Android ARM64 扩展，然后重启 Godot。"
+        status_label.text = "原生中文 VM 尚未加载。请先编译并安装 C++ 扩展。"
         return
-
     var compiler: Object = ClassDB.instantiate("ChineseLanguage")
     if compiler == null:
-        status_label.text = "无法创建 ChineseLanguage 编译器实例"
+        status_label.text = "无法创建原生中文语言实例"
         return
-
     var result: Variant = compiler.call("compile", source_editor.text)
-    compiler = null
     if not (result is Dictionary):
-        status_label.text = "编译器返回格式错误"
-        return
-
-    if not bool(result.get("ok", false)):
-        status_label.text = "编译失败：" + str(result.get("error", "未知错误"))
+        status_label.text = "编译失败：原生编译器返回格式错误"
         output_editor.text = ""
+        compiler = null
         return
-
-    var selected_nodes: Array[Node] = get_editor_interface().get_selection().get_selected_nodes()
-    if selected_nodes.is_empty():
-        status_label.text = "请先在场景树或 2D/3D 视图中选中一个游戏节点"
+    if not bool(result.get("ok", false)):
+        status_label.text = "编译失败：" + str(result.get("error", "未知编译错误"))
+        output_editor.text = ""
+        compiler = null
         return
-    var target: Node = selected_nodes[0]
-    var base_class := target.get_class()
-    if not base_class.is_valid_identifier():
-        status_label.text = "无法确定目标节点类型：" + base_class
+    var bytecode: PackedByteArray = result.get("bytecode", PackedByteArray())
+    if bytecode.is_empty():
+        status_label.text = "编译器没有生成有效的 ZHBC 字节码"
+        compiler = null
         return
-
-    var generated := "extends " + base_class + "\n\n" + str(result.get("code", ""))
     var source_dir := ProjectSettings.globalize_path("res://scripts")
     var output_dir := ProjectSettings.globalize_path("res://generated")
-    var source_error := DirAccess.make_dir_recursive_absolute(source_dir)
-    var output_error := DirAccess.make_dir_recursive_absolute(output_dir)
-    if source_error != OK and source_error != ERR_ALREADY_EXISTS:
-        status_label.text = "无法创建 scripts 目录，错误码：" + str(source_error)
+    var e1 := DirAccess.make_dir_recursive_absolute(source_dir)
+    var e2 := DirAccess.make_dir_recursive_absolute(output_dir)
+    if e1 != OK and e1 != ERR_ALREADY_EXISTS:
+        status_label.text = "无法创建 scripts 目录：" + str(e1)
+        compiler = null
         return
-    if output_error != OK and output_error != ERR_ALREADY_EXISTS:
-        status_label.text = "无法创建 generated 目录，错误码：" + str(output_error)
+    if e2 != OK and e2 != ERR_ALREADY_EXISTS:
+        status_label.text = "无法创建 generated 目录：" + str(e2)
+        compiler = null
         return
-
-    var source_file := FileAccess.open(SOURCE_PATH, FileAccess.WRITE)
-    if source_file == null:
-        status_label.text = "无法保存中文源文件：" + SOURCE_PATH
+    var src := FileAccess.open(SOURCE_PATH, FileAccess.WRITE)
+    if src == null:
+        status_label.text = "无法保存中文源文件"
+        compiler = null
         return
-    source_file.store_string(source_editor.text)
-    source_file.close()
-
-    var output_file := FileAccess.open(OUTPUT_PATH, FileAccess.WRITE)
-    if output_file == null:
-        status_label.text = "无法写入编译结果：" + OUTPUT_PATH
+    src.store_string(source_editor.text)
+    src.close()
+    var out := FileAccess.open(BYTECODE_PATH, FileAccess.WRITE)
+    if out == null:
+        status_label.text = "无法写入 ZHBC 字节码"
+        compiler = null
         return
-    output_file.store_string(generated)
-    output_file.close()
-
-    var runtime_script := GDScript.new()
-    runtime_script.source_code = generated
-    var script_error := runtime_script.reload()
-    if script_error != OK:
-        status_label.text = "生成脚本无法通过 Godot 检查，错误码：" + str(script_error)
-        output_editor.text = generated
-        return
-
-    var previous_script: Script = target.get_script()
-    var undo_redo := get_undo_redo()
-    undo_redo.create_action("绑定中文游戏脚本")
-    undo_redo.add_do_property(target, "script", runtime_script)
-    undo_redo.add_undo_property(target, "script", previous_script)
-    undo_redo.commit_action()
-
-    output_editor.text = generated
+    out.store_buffer(bytecode)
+    out.close()
+    var execution: Dictionary = compiler.call("run", bytecode, get_editor_interface().get_edited_scene_root())
+    output_editor.text = str(execution.get("output", "")) + ("" if bool(execution.get("ok", false)) else str(execution.get("error", "执行失败")))
+    status_label.text = "原生编译并执行成功 · ZHBC v2 · %d 字节" % bytecode.size() if bool(execution.get("ok", false)) else "VM 执行失败"
+    compiler = null
     get_editor_interface().get_resource_filesystem().scan()
-    status_label.text = "编译并绑定成功！脚本已附加到节点“%s”（%s）。运行场景即可执行。" % [target.name, base_class]
