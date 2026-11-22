@@ -37,6 +37,19 @@ int main() {
     require(function.ok, "Chinese function declaration compiles");
     require(function.generated_code.find("func _zh_") != std::string::npos, "函数 becomes func");
 
+    const auto game_events = compiler.compile(
+        "当 游戏开始:\n"
+        "打印(\"开始\")\n"
+        "结束\n"
+        "当 每帧(delta):\n"
+        "自身.position.x += 100 * delta\n"
+        "结束\n"
+    );
+    require(game_events.ok, "game lifecycle event handlers compile");
+    require(game_events.generated_code.find("func _ready():") != std::string::npos, "游戏开始 maps to _ready");
+    require(game_events.generated_code.find("func _process(delta):") != std::string::npos, "每帧 maps to _process");
+    require(game_events.generated_code.find("self . position . x") != std::string::npos, "自身 maps to self");
+
     const auto unmatched = compiler.compile("结束\n");
     require(!unmatched.ok, "unmatched 结束 is rejected");
 
