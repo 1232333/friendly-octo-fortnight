@@ -13,5 +13,10 @@ func _initialize() -> void:
         quit(1)
         return
 
-    print("Plugin Factory 0.3.1 scripts parsed successfully.")
+    if not FileAccess.file_exists("res://addons/plugin_factory/templates/cpp_extension/CMakeLists.txt"):
+        push_error("C++ extension template is missing.")
+        quit(1)
+        return
+
+    print("Plugin Factory 0.4.0 scripts parsed and C++ template found.")
     quit(0)
