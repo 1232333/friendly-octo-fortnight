@@ -48,7 +48,7 @@ class BuilderTests(unittest.TestCase):
             with patch.object(builder, "tool_version", return_value="aarch64-unknown-linux-android"), \\
                  patch.object(builder.platform, "machine", return_value="aarch64"), \\
                  patch.object(builder.shutil, "which", side_effect=lambda name: f"/termux/bin/{name}"), \\
-                 patch.dict(builder.os.environ, {"ANDROID_NDK_HOME": str(sysroot.parents[3])}, clear=False):
+                 patch.dict(builder.os.environ, {"ANDROID_NDK_HOME": str(sysroot.parents[4])}, clear=False):
                 commands = []
                 def fake_run(command, cwd, log_file, timeout=3600):
                     commands.append(command)
