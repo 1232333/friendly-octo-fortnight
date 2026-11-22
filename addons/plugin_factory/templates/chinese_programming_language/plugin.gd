@@ -76,7 +76,7 @@ func _load_initial_source() -> String:
             var saved_source := file.get_as_text()
             file.close()
             return saved_source
-    return "变量 分数: 整数 = 80\\n打印(\\\"分数：\\\", 分数)\\n如果 分数 >= 60:\\n    打印(\\\"及格\\\")\\n否则:\\n    打印(\\\"不及格\\\")\\n结束\\n"
+    return "变量 分数: 整数 = 80\n打印(\"分数：\", 分数)\n如果 分数 >= 60:\n    打印(\"及格\")\n否则:\n    打印(\"不及格\")\n结束\n"
 
 
 func _compile_source() -> void:
