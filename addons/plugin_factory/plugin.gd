@@ -910,7 +910,7 @@ func _create_cpp_starter() -> void:
         builder_status_label.text = "创建模板失败：" + copy_error
         return
 
-    var extension_source := source_root.path_join("chinese_native.gdextension")
+    var extension_source := source_root.path_join("chinese_native.gdextension.template")
     var extension_error := DirAccess.copy_absolute(
         ProjectSettings.globalize_path(extension_source),
         extension_file
