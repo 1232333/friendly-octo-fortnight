@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           test -s addons/plugin_factory/plugin.cfg
           test -s addons/plugin_factory/plugin.gd
-          grep -q '^\\[plugin\\]' addons/plugin_factory/plugin.cfg
+          grep -Fq '[plugin]' addons/plugin_factory/plugin.cfg
           grep -q '^@tool' addons/plugin_factory/plugin.gd
           echo "Plugin Factory addon files found."
 
