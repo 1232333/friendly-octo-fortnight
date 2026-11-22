@@ -117,9 +117,11 @@ def health() -> dict:
         if ndk_root else None
     )
     ndk_ready = bool(ndk_sysroot and (ndk_sysroot / "usr" / "include" / "stdint.h").is_file())
+    termux_lib_dir = Path(os.environ.get("PREFIX", "/data/data/com.termux/files/usr")) / "lib"
+    unwind_ready = (termux_lib_dir / "libunwind.a").is_file()
     android_target = bool(target and "android" in target.lower())
     arm64_device = platform.machine() in ("aarch64", "arm64")
-    ready = required and arm64_device and android_target and ndk_ready
+    ready = required and arm64_device and android_target and ndk_ready and unwind_ready
     return {
         "ok": ready,
         "service": "Plugin Factory Termux C++ Builder",
@@ -129,10 +131,11 @@ def health() -> dict:
         "clang_target": target,
         "android_ndk_home": str(ndk_root) if ndk_root else "",
         "ndk_sysroot_ready": ndk_ready,
+        "termux_libunwind_ready": unwind_ready,
         "message": (
-            "Termux 原生 Clang + Android NDK sysroot 编译环境就绪"
+            "Termux 原生 Clang + Android NDK sysroot + libunwind 编译环境就绪"
             if ready
-            else "请检查 Termux 原生 clang、CMake、Ninja、Git，以及 Android NDK sysroot。"
+            else "请检查 Termux 原生 clang、CMake、Ninja、Git、NDK sysroot，并确认已安装 ndk-sysroot（提供 libunwind.a）。"
         ),
     }
 
@@ -163,6 +166,9 @@ def build_cpp(project: Path, payload: dict) -> dict:
     )
     if not ndk_sysroot or not (ndk_sysroot / "usr" / "include" / "stdint.h").is_file():
         raise ValueError("找不到 Android NDK ARM64 sysroot。请重新运行 Termux 安装脚本。")
+    termux_lib_dir = Path(os.environ.get("PREFIX", "/data/data/com.termux/files/usr")) / "lib"
+    if not (termux_lib_dir / "libunwind.a").is_file():
+        raise ValueError("缺少 Termux Android 运行库 libunwind.a。请在 Termux 执行：pkg install ndk-sysroot")
 
     cmake = shutil.which("cmake")
     ninja = shutil.which("ninja")
@@ -189,8 +195,8 @@ def build_cpp(project: Path, payload: dict) -> dict:
         "-DCMAKE_SYSROOT=" + str(ndk_sysroot),
         "-DCMAKE_BUILD_TYPE=Release",
         "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
-        "-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld",
-        "-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld",
+        "-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld -L" + str(termux_lib_dir),
+        "-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld -L" + str(termux_lib_dir),
         "-DANDROID_ABI=arm64-v8a",
         "-DANDROID_PLATFORM=android-24",
         "-DANDROID_STL=c++_static",
