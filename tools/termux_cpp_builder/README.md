@@ -1,6 +1,6 @@
 # Termux C++ Builder
 
-This local service is used by the Plugin Factory editor plugin.
+This local service is used by the Plugin Factory 0.5.0 editor plugin.
 
 ## Install or update
 
