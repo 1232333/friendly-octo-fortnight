@@ -74,6 +74,24 @@ class BuilderTests(unittest.TestCase):
             self.assertIn("-DCMAKE_SYSROOT=" + str(sysroot), configure)
             self.assertIn("-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld -L" + str(termux_lib), configure)
 
+    def test_allow_git_directory_registers_only_exact_checkout_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            checkout = Path(temporary) / "project" / ".plugin_factory" / "cpp-build" / "_deps" / "godot-cpp-src"
+            with patch.object(
+                builder.subprocess, "run",
+                side_effect=[
+                    __import__("subprocess").CompletedProcess([], 1, stdout="", stderr=""),
+                    __import__("subprocess").CompletedProcess([], 0, stdout="", stderr=""),
+                ],
+            ) as run:
+                builder.allow_git_directory(checkout)
+            self.assertEqual(run.call_args_list[0].args[0], [
+                "git", "config", "--global", "--get-all", "safe.directory"
+            ])
+            self.assertEqual(run.call_args_list[1].args[0], [
+                "git", "config", "--global", "--add", "safe.directory", str(checkout.resolve())
+            ])
+
     def test_package_chinese_plugin_requires_android_binary_and_packages_addon_root(self):
         with tempfile.TemporaryDirectory() as temporary:
             project = Path(temporary) / "MyGame"
