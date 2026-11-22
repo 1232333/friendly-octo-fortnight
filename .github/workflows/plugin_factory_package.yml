@@ -65,8 +65,11 @@ jobs:
           grep -q '编译 C++ 扩展' addons/plugin_factory/plugin.gd
           grep -q '打包整个项目 ZIP' addons/plugin_factory/plugin.gd
           grep -q '打包中文编程插件 ZIP' addons/plugin_factory/plugin.gd
-          grep -q '升级现有中文编程插件' addons/plugin_factory/plugin.gd
-          grep -q '_upgrade_chinese_plugin' addons/plugin_factory/plugin.gd
+          grep -Fq '创建 / 更新中文编程语言' addons/plugin_factory/plugin.gd
+          grep -q '_setup_chinese_plugin' addons/plugin_factory/plugin.gd
+          grep -q '_copy_template_directory_missing' addons/plugin_factory/plugin.gd
+          ! grep -q '升级现有中文编程插件' addons/plugin_factory/plugin.gd
+          ! grep -q '_upgrade_chinese_plugin' addons/plugin_factory/plugin.gd
           grep -q 'package_chinese_plugin' tools/termux_cpp_builder/server.py
           grep -q 'addons.*chinese_programming_language.*bin.*android' tools/termux_cpp_builder/server.py
           python3 -m py_compile tools/termux_cpp_builder/server.py
