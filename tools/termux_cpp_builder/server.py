@@ -140,6 +140,30 @@ def health() -> dict:
     }
 
 
+def allow_git_directory(path: Path) -> None:
+    """Trust only the FetchContent checkout under this project's build directory.
+
+    Android shared-storage ownership can differ from Termux's UID. Git then
+    rejects CMake's freshly cloned godot-cpp checkout as dubious ownership.
+    Register the exact checkout path (not '*') in the user's protected config.
+    """
+    safe_path = str(path.resolve())
+    listed = subprocess.run(
+        ["git", "config", "--global", "--get-all", "safe.directory"],
+        capture_output=True, text=True, timeout=10, check=False,
+    )
+    if listed.returncode not in (0, 1):
+        raise ValueError("无法读取 Git safe.directory 配置：" + (listed.stderr or "").strip())
+    if safe_path in (listed.stdout or "").splitlines():
+        return
+    added = subprocess.run(
+        ["git", "config", "--global", "--add", "safe.directory", safe_path],
+        capture_output=True, text=True, timeout=10, check=False,
+    )
+    if added.returncode != 0:
+        raise ValueError("无法将 godot-cpp 构建目录加入 Git 安全列表：" + (added.stderr or "").strip())
+
+
 def build_cpp(project: Path, payload: dict) -> dict:
     source = project / "cpp"
     cmake_file = source / "CMakeLists.txt"
@@ -186,6 +210,9 @@ def build_cpp(project: Path, payload: dict) -> dict:
     if build_dir.exists():
         shutil.rmtree(build_dir)
     target_triple = "aarch64-linux-android24"
+    # FetchContent clones godot-cpp inside Android shared storage. Register
+    # only that exact checkout path so Git accepts the Termux/Android UID mix.
+    allow_git_directory(build_dir / "_deps" / "godot-cpp-src")
     configure = [
         cmake, "-S", str(source), "-B", str(build_dir), "-G", "Ninja",
         "-DCMAKE_C_COMPILER=" + clang,
