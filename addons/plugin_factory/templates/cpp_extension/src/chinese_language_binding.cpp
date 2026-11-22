@@ -3,6 +3,7 @@
 #include "chinese_vm.hpp"
 #include <godot_cpp/classes/canvas_item.hpp>
 #include <godot_cpp/classes/control.hpp>
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -69,4 +70,59 @@ Dictionary ChineseLanguage::run(const PackedByteArray &bytecode,Node *scene_root
     Dictionary response;response["ok"]=result.ok;response["output"]=String::utf8(result.output.c_str());response["error"]=String::utf8(result.error.c_str());
     if(result.ok&&!result.output.empty())UtilityFunctions::print(String::utf8(result.output.c_str()));
     return response;
+}
+
+
+void ChineseProgram::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("set_bytecode", "value"), &ChineseProgram::set_bytecode);
+    ClassDB::bind_method(D_METHOD("get_bytecode"), &ChineseProgram::get_bytecode);
+    ClassDB::bind_method(D_METHOD("load_bytecode", "path"), &ChineseProgram::load_bytecode);
+    ADD_PROPERTY(PropertyInfo(Variant::PACKED_BYTE_ARRAY, "bytecode"), "set_bytecode", "get_bytecode");
+}
+void ChineseProgram::set_bytecode(const PackedByteArray &value) {
+    bytecode = value;
+    if (is_inside_tree()) _initialize_runtime();
+}
+PackedByteArray ChineseProgram::get_bytecode() const { return bytecode; }
+bool ChineseProgram::load_bytecode(const String &path) {
+    Ref<FileAccess> file = FileAccess::open(path, FileAccess::READ);
+    if (file.is_null()) return false;
+    set_bytecode(file->get_buffer(file->get_length()));
+    return true;
+}
+void ChineseProgram::_initialize_runtime() {
+    set_process(false);
+    has_process_event = false;
+    if (bytecode.is_empty()) return;
+    std::vector<uint8_t> bytes;
+    bytes.reserve((size_t)bytecode.size());
+    for (int64_t i = 0; i < bytecode.size(); ++i) bytes.push_back(bytecode[i]);
+    chinese::Bytecode decoded;
+    std::string error;
+    if (!chinese::Bytecode::decode(bytes, decoded, error)) {
+        UtilityFunctions::push_error(String::utf8(error.c_str()));
+        return;
+    }
+    bool has_ready_event = false;
+    for (const auto &fn : decoded.functions) {
+        if (fn.name == "@event:游戏开始") has_ready_event = true;
+        if (fn.name == "@event:每帧") has_process_event = true;
+    }
+    if (runtime.is_null()) runtime.instantiate();
+    if (has_ready_event) {
+        Dictionary result = runtime->run(bytecode, this, String("游戏开始"));
+        if (!bool(result.get("ok", false))) {
+            UtilityFunctions::push_error(String("中文事件“游戏开始”执行失败：") + String(result.get("error", "")));
+        }
+    }
+    set_process(has_process_event);
+}
+void ChineseProgram::_ready() { _initialize_runtime(); }
+void ChineseProgram::_process(double delta) {
+    if (!has_process_event || runtime.is_null()) return;
+    Dictionary result = runtime->run(bytecode, this, String("每帧"), delta);
+    if (!bool(result.get("ok", false))) {
+        UtilityFunctions::push_error(String("中文事件“每帧”执行失败：") + String(result.get("error", "")));
+        set_process(false);
+    }
 }
