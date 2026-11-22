@@ -45,7 +45,11 @@ class BuilderTests(unittest.TestCase):
             (source / "CMakeLists.txt").write_text("project(test)", encoding="utf-8")
             (addon / "plugin.cfg").write_text("[plugin]", encoding="utf-8")
             (addon / "chinese_native.gdextension").write_text("[configuration]", encoding="utf-8")
+            termux_lib = Path(temporary) / "termux" / "lib"
+            termux_lib.mkdir(parents=True)
+            (termux_lib / "libunwind.a").write_bytes(b"fake-unwind")
             with (
+                patch.dict(builder.os.environ, {"PREFIX": str(termux_lib.parent)}, clear=False),
                 patch.object(builder, "tool_version", return_value="aarch64-unknown-linux-android"),
                 patch.object(builder.platform, "machine", return_value="aarch64"),
                 patch.object(builder.shutil, "which", side_effect=lambda name: f"/termux/bin/{name}"),
@@ -68,6 +72,7 @@ class BuilderTests(unittest.TestCase):
             self.assertIn("-DCMAKE_CXX_COMPILER=/termux/bin/clang++", configure)
             self.assertIn("-DCMAKE_CXX_COMPILER_TARGET=aarch64-linux-android24", configure)
             self.assertIn("-DCMAKE_SYSROOT=" + str(sysroot), configure)
+            self.assertIn("-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld -L" + str(termux_lib), configure)
 
     def test_package_chinese_plugin_requires_android_binary_and_packages_addon_root(self):
         with tempfile.TemporaryDirectory() as temporary:

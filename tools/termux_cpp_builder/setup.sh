@@ -13,7 +13,7 @@ if ! command -v pkg >/dev/null 2>&1; then
 fi
 
 pkg update -y
-pkg install -y python cmake ninja clang git curl tar xz-utils
+pkg install -y python cmake ninja clang git curl tar xz-utils ndk-sysroot
 
 mkdir -p "$INSTALL_DIR" "$NDK_PARENT"
 cp "$SCRIPT_DIR/server.py" "$INSTALL_DIR/server.py"
