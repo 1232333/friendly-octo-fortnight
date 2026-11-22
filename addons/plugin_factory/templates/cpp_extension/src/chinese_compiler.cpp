@@ -203,8 +203,9 @@ CompileResult Compiler::compile(const std::string &source) const {
                 result.error = "第 " + std::to_string(line_number) + " 行：条件不能为空";
                 return result;
             }
+            std::vector<Token> condition(tokens.begin(), tokens.begin() + condition_end);
             output << (first == "如果" ? "if " : "while ")
-                   << expression(tokens, 1) << ":\n";
+                   << expression(condition, 1) << ":\n";
             blocks.push_back(first == "如果" ? "if" : "loop");
             ++indent;
             continue;
