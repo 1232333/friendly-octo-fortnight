@@ -213,6 +213,12 @@ func _create_interface() -> void:
     template_button.pressed.connect(_create_cpp_starter)
     cpp_row_one.add_child(template_button)
 
+    var upgrade_button := Button.new()
+    upgrade_button.text = "升级现有中文编程插件"
+    upgrade_button.custom_minimum_size = Vector2(0, 44)
+    upgrade_button.pressed.connect(_upgrade_chinese_plugin)
+    panel.add_child(upgrade_button)
+
     var cpp_row_two := HBoxContainer.new()
     panel.add_child(cpp_row_two)
 
@@ -926,6 +932,52 @@ func _on_builder_request_completed(
         _log("中文编程插件独立打包完成：" + str(data.get("package", "")))
         _log("插件文件数：" + str(data.get("file_count", 0)))
     builder_action = ""
+
+
+func _upgrade_chinese_plugin() -> void:
+    if not FileAccess.file_exists("res://addons/chinese_programming_language/plugin.cfg"):
+        builder_status_label.text = "没有找到现有中文插件，请先点击“创建中文编程插件”。"
+        return
+    if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://cpp/src")):
+        builder_status_label.text = "没有找到 cpp/src，请先创建中文编程插件工程。"
+        return
+
+    var mappings := [
+        ["res://addons/plugin_factory/templates/chinese_programming_language/plugin.cfg", "res://addons/chinese_programming_language/plugin.cfg"],
+        ["res://addons/plugin_factory/templates/chinese_programming_language/plugin.gd", "res://addons/chinese_programming_language/plugin.gd"],
+        ["res://addons/plugin_factory/templates/chinese_programming_language/chinese_native.gdextension", "res://addons/chinese_programming_language/chinese_native.gdextension"],
+        ["res://addons/plugin_factory/templates/cpp_extension/src/chinese_language_binding.cpp", "res://cpp/src/chinese_language_binding.cpp"],
+        ["res://addons/plugin_factory/templates/cpp_extension/src/chinese_language_binding.hpp", "res://cpp/src/chinese_language_binding.hpp"]
+    ]
+    for mapping in mappings:
+        var copy_error := _copy_template_file(str(mapping[0]), str(mapping[1]))
+        if not copy_error.is_empty():
+            builder_status_label.text = "升级失败：" + copy_error
+            return
+
+    builder_status_label.text = "中文插件入口与 C++ 运行时已升级。请点击“编译 C++ 扩展”，完成后重启 Godot。"
+    _log("中文插件升级完成：已更新插件配置、编辑界面、GDExtension 描述和 C++ 运行时绑定。")
+    get_editor_interface().get_resource_filesystem().scan()
+
+
+func _copy_template_file(source_path: String, destination_path: String) -> String:
+    var source_file := FileAccess.open(source_path, FileAccess.READ)
+    if source_file == null:
+        return "无法读取模板文件：" + source_path
+    var data := source_file.get_buffer(source_file.get_length())
+    source_file.close()
+
+    var destination_absolute := ProjectSettings.globalize_path(destination_path)
+    var make_error := DirAccess.make_dir_recursive_absolute(destination_absolute.get_base_dir())
+    if make_error != OK and make_error != ERR_ALREADY_EXISTS:
+        return "无法创建目标目录：" + destination_path
+
+    var destination_file := FileAccess.open(destination_path, FileAccess.WRITE)
+    if destination_file == null:
+        return "无法写入目标文件：" + destination_path
+    destination_file.store_buffer(data)
+    destination_file.close()
+    return ""
 
 
 func _create_cpp_starter() -> void:
