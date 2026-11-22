@@ -21,9 +21,6 @@ add_library(chinese_native SHARED
 target_link_libraries(chinese_native PRIVATE godot-cpp)
 target_include_directories(chinese_native PRIVATE src)
 
-if(PLUGIN_FACTORY_ANDROID_TERMUX)
-    target_link_options(chinese_native PRIVATE -static-libstdc++)
-endif()
 
 set_target_properties(chinese_native PROPERTIES
     OUTPUT_NAME "chinese_native"
