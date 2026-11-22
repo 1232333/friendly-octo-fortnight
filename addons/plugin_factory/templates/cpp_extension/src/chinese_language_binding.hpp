@@ -17,6 +17,7 @@ public:
 class ChineseProgram : public Node {
     GDCLASS(ChineseProgram, Node)
     PackedByteArray bytecode;
+    String bytecode_path;
     Ref<ChineseLanguage> runtime;
     bool has_process_event = false;
     void _initialize_runtime();
@@ -24,6 +25,8 @@ protected:
     static void _bind_methods();
 public:
     void set_bytecode(const PackedByteArray &value);
+    void set_bytecode_path(const String &value);
+    String get_bytecode_path() const;
     PackedByteArray get_bytecode() const;
     bool load_bytecode(const String &path);
     void _ready() override;
