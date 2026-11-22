@@ -1,0 +1,264 @@
+#!/usr/bin/env python3
+"""Local-only build agent for Godot projects edited on Android.
+
+Run inside Termux. It intentionally binds to 127.0.0.1 and only accepts
+projects stored in Android shared storage.
+"""
+from __future__ import annotations
+
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import time
+import zipfile
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import urlparse
+
+HOST = "127.0.0.1"
+PORT = 8766
+MAX_BODY = 1024 * 1024
+EXCLUDED_DIRS = {
+    ".git", ".godot", ".plugin_factory", "__pycache__", ".pytest_cache",
+    "node_modules", "dist", "build", ".gradle"
+}
+EXCLUDED_SUFFIXES = {".tmp", ".pyc", ".pyo"}
+
+
+def shared_roots() -> list[Path]:
+    roots = [Path("/storage/emulated/0"), Path("/sdcard"), Path("/storage/self/primary")]
+    shared = Path.home() / "storage" / "shared"
+    try:
+        roots.insert(0, shared.resolve(strict=True))
+    except OSError:
+        pass
+    result: list[Path] = []
+    for root in roots:
+        try:
+            resolved = root.resolve(strict=True)
+            if resolved not in result:
+                result.append(resolved)
+        except OSError:
+            continue
+    return result
+
+
+def resolve_project(raw: str) -> Path:
+    if not raw or len(raw) > 4096:
+        raise ValueError("project_dir 缺失或路径过长")
+    project = Path(raw).expanduser().resolve(strict=True)
+    if not project.is_dir() or not (project / "project.godot").is_file():
+        raise ValueError("所选目录不是 Godot 项目（没有 project.godot）")
+    roots = shared_roots()
+    if not any(project == root or root in project.parents for root in roots):
+        raise ValueError(
+            "出于安全限制，只允许访问 Android 共享存储中的项目。"
+            "请先在 Termux 执行 termux-setup-storage。"
+        )
+    return project
+
+
+def run_command(command: list[str], cwd: Path, log_file: Path, timeout: int = 3600) -> dict:
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    started = time.time()
+    with log_file.open("w", encoding="utf-8") as log:
+        log.write("$ " + " ".join(command) + "\n\n")
+        log.flush()
+        try:
+            process = subprocess.Popen(
+                command, cwd=str(cwd), stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, text=True, errors="replace",
+                bufsize=1
+            )
+            assert process.stdout is not None
+            for line in process.stdout:
+                log.write(line)
+                log.flush()
+            code = process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            return {"ok": False, "exit_code": -1, "error": "构建超时", "log": str(log_file)}
+    return {
+        "ok": code == 0,
+        "exit_code": code,
+        "elapsed_seconds": round(time.time() - started, 2),
+        "log": str(log_file),
+    }
+
+
+def tool_version(command: list[str]) -> str | None:
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=10)
+        output = (result.stdout or result.stderr).strip().splitlines()
+        return output[0] if output else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def health() -> dict:
+    versions = {
+        "python": platform.python_version(),
+        "architecture": platform.machine(),
+        "clang": tool_version(["clang++", "--version"]),
+        "cmake": tool_version(["cmake", "--version"]),
+        "ninja": tool_version(["ninja", "--version"]),
+        "git": tool_version(["git", "--version"]),
+    }
+    target = tool_version(["clang++", "-dumpmachine"]) if versions["clang"] else None
+    required = all(versions[name] for name in ("clang", "cmake", "ninja", "git"))
+    android_target = bool(target and "android" in target.lower())
+    return {
+        "ok": required and platform.machine() in ("aarch64", "arm64") and android_target,
+        "service": "Plugin Factory Termux C++ Builder",
+        "version": "0.1.0",
+        "port": PORT,
+        "versions": versions,
+        "clang_target": target,
+        "message": (
+            "Termux Android ARM64 编译环境就绪"
+            if required and android_target
+            else "请在原生 Termux 安装 clang、cmake、ninja、git；需要 Android ARM64 clang 目标"
+        ),
+    }
+
+
+def build_cpp(project: Path, payload: dict) -> dict:
+    source = project / "cpp"
+    cmake_file = source / "CMakeLists.txt"
+    if not cmake_file.is_file():
+        raise ValueError("项目缺少 cpp/CMakeLists.txt。请先点击“创建 C++ 扩展模板”。")
+
+    compiler_target = tool_version(["clang++", "-dumpmachine"]) or ""
+    if "android" not in compiler_target.lower():
+        raise ValueError(
+            "当前 clang++ 不是 Android 目标编译器："
+            + compiler_target
+            + "。请使用原生 Termux 的 clang，不要使用 Linux 交叉环境。"
+        )
+    if platform.machine() not in ("aarch64", "arm64"):
+        raise ValueError("当前设备不是 ARM64，不能生成 Android ARM64 扩展。")
+
+    cmake = shutil.which("cmake")
+    ninja = shutil.which("ninja")
+    if not cmake or not ninja:
+        raise ValueError("缺少 CMake 或 Ninja，请运行 Termux 安装脚本。")
+
+    build_dir = project / ".plugin_factory" / "cpp-build"
+    log_file = project / ".plugin_factory" / "cpp-build.log"
+    jobs = max(1, min(int(payload.get("jobs", 2)), 4))
+    configure = [
+        cmake, "-S", str(source), "-B", str(build_dir), "-G", "Ninja",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_CXX_COMPILER=clang++",
+        "-DCMAKE_C_COMPILER=clang",
+        "-DPLUGIN_FACTORY_ANDROID_TERMUX=ON",
+    ]
+    configured = run_command(configure, project, log_file, timeout=1800)
+    if not configured["ok"]:
+        return {"ok": False, "stage": "configure", **configured}
+
+    built = run_command(
+        [cmake, "--build", str(build_dir), "--parallel", str(jobs)],
+        project, log_file, timeout=3600
+    )
+    if not built["ok"]:
+        return {"ok": False, "stage": "compile", **built}
+
+    candidates = list(build_dir.rglob("libchinese_native.so"))
+    if not candidates:
+        return {
+            "ok": False, "stage": "collect",
+            "error": "编译命令成功，但没有找到 libchinese_native.so",
+            "log": str(log_file),
+        }
+    output = project / "bin" / "native"
+    output.mkdir(parents=True, exist_ok=True)
+    target = output / "libchinese_native.so"
+    shutil.copy2(candidates[0], target)
+    return {
+        "ok": True, "stage": "complete", "library": str(target),
+        "size_bytes": target.stat().st_size, "log": str(log_file),
+        "message": "Android ARM64 GDExtension 编译完成",
+    }
+
+
+def package_project(project: Path) -> dict:
+    dist = project / "dist"
+    dist.mkdir(exist_ok=True)
+    output = dist / (project.name + "-Android-ARM64-Project.zip")
+    temp = output.with_suffix(".zip.tmp")
+    file_count = 0
+    with zipfile.ZipFile(temp, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
+        for current, dirs, files in os.walk(project):
+            current_path = Path(current)
+            dirs[:] = sorted(
+                d for d in dirs
+                if d not in EXCLUDED_DIRS and not d.startswith(".Trash")
+            )
+            for filename in sorted(files):
+                path = current_path / filename
+                if path.suffix.lower() in EXCLUDED_SUFFIXES:
+                    continue
+                if path == output or path == temp:
+                    continue
+                relative = path.relative_to(project)
+                archive.write(path, relative.as_posix())
+                file_count += 1
+    temp.replace(output)
+    return {
+        "ok": True, "package": str(output),
+        "size_bytes": output.stat().st_size, "file_count": file_count,
+        "message": "Godot 项目 ZIP 打包完成（不包含编辑器缓存和中间构建目录）",
+    }
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = "PluginFactoryBuilder/0.1"
+
+    def _send(self, status: int, data: dict) -> None:
+        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:
+        if urlparse(self.path).path != "/health":
+            self._send(404, {"ok": False, "error": "接口不存在"})
+            return
+        self._send(200, health())
+
+    def do_POST(self) -> None:
+        route = urlparse(self.path).path
+        if route not in ("/build", "/package"):
+            self._send(404, {"ok": False, "error": "接口不存在"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0 or length > MAX_BODY:
+                raise ValueError("请求数据为空或超过大小限制")
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            project = resolve_project(str(payload.get("project_dir", "")))
+            result = build_cpp(project, payload) if route == "/build" else package_project(project)
+            self._send(200 if result.get("ok") else 500, result)
+        except (ValueError, OSError, json.JSONDecodeError) as error:
+            self._send(400, {"ok": False, "error": str(error)})
+
+    def log_message(self, fmt: str, *args) -> None:
+        print("[HTTP] " + (fmt % args), flush=True)
+
+
+def main() -> None:
+    print("Plugin Factory Termux C++ Builder 0.1.0", flush=True)
+    print(f"Listening only on http://{HOST}:{PORT}", flush=True)
+    print("Keep this Termux session alive while Godot is building.", flush=True)
+    ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
+
+
+if __name__ == "__main__":
+    main()
