@@ -31,7 +31,7 @@ Object *resolve_node(const chinese::Value &v) {
 }
 void ChineseLanguage::_bind_methods() {
     ClassDB::bind_method(D_METHOD("compile", "source"), &ChineseLanguage::compile);
-    ClassDB::bind_method(D_METHOD("run", "bytecode", "scene_root"), &ChineseLanguage::run);
+    ClassDB::bind_method(D_METHOD("run", "bytecode", "scene_root", "event_name", "delta"), &ChineseLanguage::run, DEFVAL(String()), DEFVAL(0.0));
 }
 Dictionary ChineseLanguage::compile(const String &source) const {
     const CharString utf8=source.utf8();
@@ -41,7 +41,7 @@ Dictionary ChineseLanguage::compile(const String &source) const {
     if(result.ok){const std::vector<uint8_t> bytes=result.bytecode.encode();PackedByteArray packed;packed.resize((int64_t)bytes.size());for(int64_t i=0;i<(int64_t)bytes.size();++i)packed.set(i,bytes[(size_t)i]);response["bytecode"]=packed;response["format"]="ZHBC";response["version"]=2;}
     return response;
 }
-Dictionary ChineseLanguage::run(const PackedByteArray &bytecode,Node *scene_root) const {
+Dictionary ChineseLanguage::run(const PackedByteArray &bytecode,Node *scene_root,const String &event_name,double delta) const {
     std::vector<uint8_t> bytes;bytes.reserve((size_t)bytecode.size());for(int64_t i=0;i<bytecode.size();++i)bytes.push_back(bytecode[i]);
     chinese::Bytecode decoded;std::string error;chinese::VmResult result;
     if(chinese::Bytecode::decode(bytes,decoded,error)){
@@ -64,7 +64,7 @@ Dictionary ChineseLanguage::run(const PackedByteArray &bytecode,Node *scene_root
             }
             err="未知的 Godot 宿主函数："+name;return false;
         };
-        chinese::VirtualMachine vm;result=vm.run(decoded,host);
+        int entry=-1;std::vector<chinese::Value> event_args;if(!event_name.is_empty()){const std::string wanted="@event:"+std::string(event_name.utf8().get_data());for(size_t i=0;i<decoded.functions.size();++i)if(decoded.functions[i].name==wanted){entry=(int)i;break;}if(entry<0){result.error="找不到事件入口："+std::string(event_name.utf8().get_data());}else{const auto&fn=decoded.functions[(size_t)entry];if(fn.parameter_count==1)event_args.emplace_back(delta);else if(fn.parameter_count!=0)result.error="事件入口参数数量不受支持";}}if(result.error.empty()){chinese::VirtualMachine vm;result=vm.run(decoded,host,entry,event_args);}
     }else result.error=error;
     Dictionary response;response["ok"]=result.ok;response["output"]=String::utf8(result.output.c_str());response["error"]=String::utf8(result.error.c_str());
     if(result.ok&&!result.output.empty())UtilityFunctions::print(String::utf8(result.output.c_str()));
