@@ -26,6 +26,7 @@ if ! find "$NDK_PARENT" -path '*/build/cmake/android.toolchain.cmake' -type f -p
     "https://github.com/lzhiyong/termux-ndk/releases/download/android-ndk/android-ndk-r29-aarch64.tar.xz" \
     -o "$NDK_ARCHIVE"
   tar -xJf "$NDK_ARCHIVE" -C "$NDK_PARENT"
+  rm -f "$NDK_ARCHIVE"
 fi
 
 TOOLCHAIN="$(find "$NDK_PARENT" -path '*/build/cmake/android.toolchain.cmake' -type f -print -quit)"
