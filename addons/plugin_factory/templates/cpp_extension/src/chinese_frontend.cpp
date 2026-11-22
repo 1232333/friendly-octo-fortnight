@@ -51,6 +51,7 @@ class Parser {
   if(eat(K::Print)){int n=0;if(eat(K::LParen)){if(cur().k!=K::RParen){do{expr();++n;}while(eat(K::Comma));}need(K::RParen,"打印语句缺少右括号");}else{expr();n=1;}emit(Op::Print,n);return;}
   if(eat(K::If)){expr();need(K::Colon,"如果条件后需要冒号“:”");int jf=(int)b.instructions.size();emit(Op::JumpIfFalse,0);while(!is_else()&&cur().k!=K::EndBlock&&cur().k!=K::End&&err.empty())statement();if(is_else()){++p;eat(K::Colon);int j=(int)b.instructions.size();emit(Op::Jump,0);b.instructions[jf].operand=(int)b.instructions.size();while(cur().k!=K::EndBlock&&cur().k!=K::End&&err.empty())statement();b.instructions[j].operand=(int)b.instructions.size();}else b.instructions[jf].operand=(int)b.instructions.size();if(cur().k==K::EndBlock)++p;else fail("如果代码块缺少“结束”");return;}
   if(eat(K::EndBlock)||eat(K::Else)){fail("此处出现多余的代码块结束标记");return;}
+  if(cur().k==K::Id){expr();if(err.empty())emit(Op::Pop);return;}
   fail("不支持的语句“"+cur().s+"”；目前支持变量、打印和如果");
  }
  public: explicit Parser(std::vector<Tok>v):t(std::move(v)){}
