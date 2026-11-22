@@ -1,0 +1,59 @@
+name: Plugin Factory Package
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+      - plugin-factory-bootstrap
+    paths:
+      - "addons/plugin_factory/**"
+      - ".github/workflows/plugin_factory_package.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugin-factory-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate addon structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s addons/plugin_factory/plugin.cfg
+          test -s addons/plugin_factory/plugin.gd
+          grep -Fq '[plugin]' addons/plugin_factory/plugin.cfg
+          grep -q '^@tool' addons/plugin_factory/plugin.gd
+          echo "Plugin Factory addon files found."
+
+      - name: Create ZIP package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          zip -qr dist/PluginFactory-0.1.0-Godot-4.7.2.zip addons/plugin_factory
+          unzip -t dist/PluginFactory-0.1.0-Godot-4.7.2.zip
+          sha256sum dist/PluginFactory-0.1.0-Godot-4.7.2.zip | tee dist/SHA256SUMS.txt
+          ls -lh dist/
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PluginFactory-0.1.0-Godot-4.7.2
+          path: |
+            dist/PluginFactory-0.1.0-Godot-4.7.2.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
