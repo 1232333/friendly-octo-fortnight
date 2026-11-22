@@ -65,22 +65,20 @@ def run_command(command: list[str], cwd: Path, log_file: Path, timeout: int = 36
     log_file.parent.mkdir(parents=True, exist_ok=True)
     started = time.time()
     with log_file.open("w", encoding="utf-8") as log:
-        log.write("$ " + " ".join(command) + "\n\n")
+        log.write("$ " + " ".join(command) + "\\n\\n")
         log.flush()
         try:
-            process = subprocess.Popen(
-                command, cwd=str(cwd), stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT, text=True, errors="replace",
-                bufsize=1
+            completed = subprocess.run(
+                command, cwd=str(cwd), stdout=log, stderr=subprocess.STDOUT,
+                text=True, errors="replace", timeout=timeout, check=False
             )
-            assert process.stdout is not None
-            for line in process.stdout:
-                log.write(line)
-                log.flush()
-            code = process.wait(timeout=timeout)
+            code = completed.returncode
         except subprocess.TimeoutExpired:
-            process.kill()
+            log.write("\\nERROR: command timed out after %d seconds\\n" % timeout)
             return {"ok": False, "exit_code": -1, "error": "构建超时", "log": str(log_file)}
+        except OSError as error:
+            log.write("\\nERROR: %s\\n" % error)
+            return {"ok": False, "exit_code": -1, "error": str(error), "log": str(log_file)}
     return {
         "ok": code == 0,
         "exit_code": code,
