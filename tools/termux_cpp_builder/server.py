@@ -135,8 +135,11 @@ def health() -> dict:
 def build_cpp(project: Path, payload: dict) -> dict:
     source = project / "cpp"
     cmake_file = source / "CMakeLists.txt"
+    addon = project / "addons" / "chinese_programming_language"
     if not cmake_file.is_file():
-        raise ValueError("项目缺少 cpp/CMakeLists.txt。请先点击“创建 C++ 扩展模板”。")
+        raise ValueError("项目缺少 cpp/CMakeLists.txt。请先在插件工厂点击“创建中文编程插件”。")
+    if not (addon / "plugin.cfg").is_file() or not (addon / "chinese_native.gdextension").is_file():
+        raise ValueError("缺少 addons/chinese_programming_language 插件封装，请重新点击“创建中文编程插件”。")
 
     compiler_target = tool_version(["clang++", "-dumpmachine"]) or ""
     if "android" not in compiler_target.lower():
