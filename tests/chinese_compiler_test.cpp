@@ -24,8 +24,9 @@ int main() {
     );
 
     require(result.ok, "valid Chinese source compiles");
-    require(result.generated_code.find("var _zh_") != std::string::npos, "Chinese identifier is mangled to safe ASCII");
-    require(result.generated_code.find("if _zh_") != std::string::npos, "如果 becomes if");
+    require(result.generated_code.find("func _ready():") != std::string::npos, "top-level executable statements run in _ready");
+    require(result.generated_code.find("    var _zh_") != std::string::npos, "Chinese identifier is mangled inside runtime function");
+    require(result.generated_code.find("    if _zh_") != std::string::npos, "如果 becomes an indented if inside _ready");
     require(result.generated_code.find("else:") != std::string::npos, "否则 becomes else");
     require(result.generated_code.find("print") != std::string::npos, "打印 becomes print");
 
