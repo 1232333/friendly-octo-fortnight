@@ -12,6 +12,8 @@ on:
     paths:
       - "addons/plugin_factory/**"
       - "tests/validate_plugin_factory.gd"
+      - "tests/test_termux_builder.py"
+      - "tools/termux_cpp_builder/**"
       - ".github/workflows/plugin_factory_package.yml"
 
 permissions:
@@ -36,9 +38,13 @@ jobs:
           test -s addons/plugin_factory/plugin.cfg
           test -s addons/plugin_factory/plugin.gd
           test -s addons/plugin_factory/importer.gd
+          test -s tools/termux_cpp_builder/server.py
+          test -s addons/plugin_factory/templates/cpp_extension/CMakeLists.txt
+          test -s addons/plugin_factory/templates/cpp_extension/src/register_types.cpp
+          test -s addons/plugin_factory/templates/cpp_extension/chinese_native.gdextension
           grep -Fq '[plugin]' addons/plugin_factory/plugin.cfg
           grep -q '^@tool' addons/plugin_factory/plugin.gd
-          grep -q 'FACTORY_VERSION := "0.3.1"' addons/plugin_factory/plugin.gd
+          grep -q 'FACTORY_VERSION := "0.4.0"' addons/plugin_factory/plugin.gd
           grep -q '_visit_dependency' addons/plugin_factory/plugin.gd
           grep -q '_resolve_selection' addons/plugin_factory/plugin.gd
           grep -q '_save_profile' addons/plugin_factory/plugin.gd
@@ -49,11 +55,15 @@ jobs:
           grep -q 'ZIPReader' addons/plugin_factory/importer.gd
           grep -q '导入本地插件文件夹' addons/plugin_factory/plugin.gd
           grep -q '导入 ZIP 插件包' addons/plugin_factory/plugin.gd
+          grep -q '编译 C++ 扩展' addons/plugin_factory/plugin.gd
+          grep -q '打包整个项目 ZIP' addons/plugin_factory/plugin.gd
+          python3 -m py_compile tools/termux_cpp_builder/server.py
+          python3 -m unittest discover -s tests -p 'test_termux_builder.py'
           ! grep -q 'ZIPWriter' addons/plugin_factory/plugin.gd
           grep -q 'get_editor_main_screen' addons/plugin_factory/plugin.gd
           ! grep -q 'add_control_to_dock' addons/plugin_factory/plugin.gd
           test -s tests/validate_plugin_factory.gd
-          echo "Plugin Factory 0.3.1 feature markers found."
+          echo "Plugin Factory 0.4.0 feature markers found."
 
       - name: Install Godot 4.7.2 headless
         shell: bash
@@ -69,22 +79,30 @@ jobs:
           set -euo pipefail
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/validate_plugin_factory.gd
 
+      - name: Build C++ GDExtension template on Linux CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S addons/plugin_factory/templates/cpp_extension -B /tmp/chinese-native-build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/chinese-native-build --parallel 2
+          test -s /tmp/chinese-native-build/output/libchinese_native.so
+
       - name: Create ZIP package
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          zip -qr dist/PluginFactory-0.3.1-Godot-4.7.2.zip addons/plugin_factory
-          unzip -t dist/PluginFactory-0.3.1-Godot-4.7.2.zip
-          sha256sum dist/PluginFactory-0.3.1-Godot-4.7.2.zip | tee dist/SHA256SUMS.txt
+          zip -qr dist/PluginFactory-0.4.0-Godot-4.7.2.zip addons/plugin_factory
+          unzip -t dist/PluginFactory-0.4.0-Godot-4.7.2.zip
+          sha256sum dist/PluginFactory-0.4.0-Godot-4.7.2.zip | tee dist/SHA256SUMS.txt
           ls -lh dist/
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PluginFactory-0.3.1-Godot-4.7.2
+          name: PluginFactory-0.4.0-Godot-4.7.2
           path: |
-            dist/PluginFactory-0.3.1-Godot-4.7.2.zip
+            dist/PluginFactory-0.4.0-Godot-4.7.2.zip
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
