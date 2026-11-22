@@ -19,6 +19,7 @@ class ChineseProgram : public Node {
     PackedByteArray bytecode;
     Ref<ChineseLanguage> runtime;
     bool has_process_event = false;
+    void _initialize_runtime();
 protected:
     static void _bind_methods();
 public:
