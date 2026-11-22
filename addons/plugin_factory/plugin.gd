@@ -1,15 +1,18 @@
 @tool
 extends EditorPlugin
 
-const FACTORY_VERSION := "0.1.0"
+const FACTORY_VERSION := "0.2.0"
 const OUTPUT_PATH := "user://PluginFactory_Output.zip"
 const EXCLUDED_DIRS := [".git", ".godot", "__pycache__", ".import"]
 
 var panel: VBoxContainer
+var search_input: LineEdit
 var plugin_list: ItemList
+var details_view: RichTextLabel
 var log_view: RichTextLabel
 var status_label: Label
 var discovered_plugins: Array[Dictionary] = []
+var visible_plugins: Array[Dictionary] = []
 
 
 func _enter_tree() -> void:
@@ -27,7 +30,7 @@ func _exit_tree() -> void:
 func _create_interface() -> void:
     panel = VBoxContainer.new()
     panel.name = "插件工厂"
-    panel.custom_minimum_size = Vector2(330, 480)
+    panel.custom_minimum_size = Vector2(340, 560)
 
     var title := Label.new()
     title.text = "插件工厂 Plugin Factory"
@@ -35,31 +38,71 @@ func _create_interface() -> void:
     panel.add_child(title)
 
     var version := Label.new()
-    version.text = "版本 " + FACTORY_VERSION
+    version.text = "版本 " + FACTORY_VERSION + "  |  Godot 4.7.2"
     panel.add_child(version)
 
     var scan_button := Button.new()
-    scan_button.text = "扫描项目插件"
+    scan_button.text = "重新扫描项目插件"
+    scan_button.custom_minimum_size = Vector2(0, 44)
     scan_button.pressed.connect(_scan_plugins)
     panel.add_child(scan_button)
 
-    var select_button := Button.new()
-    select_button.text = "全选插件"
-    select_button.pressed.connect(_select_all)
-    panel.add_child(select_button)
+    search_input = LineEdit.new()
+    search_input.placeholder_text = "搜索插件名称、目录或版本…"
+    search_input.clear_button_enabled = true
+    search_input.text_changed.connect(_apply_filter)
+    panel.add_child(search_input)
 
     plugin_list = ItemList.new()
     plugin_list.select_mode = ItemList.SELECT_MULTI
-    plugin_list.custom_minimum_size = Vector2(0, 190)
+    plugin_list.allow_reselect = true
+    plugin_list.custom_minimum_size = Vector2(0, 220)
+    plugin_list.item_selected.connect(_show_plugin_details)
     panel.add_child(plugin_list)
 
+    var selection_row := HBoxContainer.new()
+    panel.add_child(selection_row)
+
+    var select_button := Button.new()
+    select_button.text = "全选显示项"
+    select_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    select_button.custom_minimum_size = Vector2(0, 42)
+    select_button.pressed.connect(_select_all)
+    selection_row.add_child(select_button)
+
+    var clear_button := Button.new()
+    clear_button.text = "清空选择"
+    clear_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    clear_button.custom_minimum_size = Vector2(0, 42)
+    clear_button.pressed.connect(_clear_selection)
+    selection_row.add_child(clear_button)
+
+    var details_title := Label.new()
+    details_title.text = "插件详情"
+    panel.add_child(details_title)
+
+    details_view = RichTextLabel.new()
+    details_view.custom_minimum_size = Vector2(0, 125)
+    details_view.fit_content = true
+    details_view.scroll_active = true
+    details_view.text = "选择一个插件查看详细信息。"
+    panel.add_child(details_view)
+
+    var check_button := Button.new()
+    check_button.text = "检查所选插件依赖与冲突"
+    check_button.custom_minimum_size = Vector2(0, 44)
+    check_button.pressed.connect(_check_selected)
+    panel.add_child(check_button)
+
     var combine_button := Button.new()
-    combine_button.text = "检查并组合插件"
+    combine_button.text = "检查并组合插件 ZIP"
+    combine_button.custom_minimum_size = Vector2(0, 48)
     combine_button.pressed.connect(_combine_selected)
     panel.add_child(combine_button)
 
     status_label = Label.new()
-    status_label.text = "等待操作"
+    status_label.text = "等待扫描"
+    status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     panel.add_child(status_label)
 
     var log_title := Label.new()
@@ -67,8 +110,9 @@ func _create_interface() -> void:
     panel.add_child(log_title)
 
     log_view = RichTextLabel.new()
-    log_view.custom_minimum_size = Vector2(0, 170)
+    log_view.custom_minimum_size = Vector2(0, 115)
     log_view.scroll_following = true
+    log_view.scroll_active = true
     panel.add_child(log_view)
 
 
@@ -80,6 +124,8 @@ func _log(message: String) -> void:
 func _scan_plugins() -> void:
     plugin_list.clear()
     discovered_plugins.clear()
+    visible_plugins.clear()
+    details_view.text = "选择一个插件查看详细信息。"
 
     var root := "res://addons"
     if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(root)):
@@ -87,14 +133,9 @@ func _scan_plugins() -> void:
         return
 
     _scan_directory(root)
+    _apply_filter(search_input.text)
 
-    for plugin in discovered_plugins:
-        var index := plugin_list.add_item(
-            "%s  |  %s" % [plugin.name, plugin.version]
-        )
-        plugin_list.set_item_metadata(index, plugin)
-
-    status_label.text = "扫描完成：%d 个插件" % discovered_plugins.size()
+    status_label.text = "扫描完成：发现 %d 个插件" % discovered_plugins.size()
     _log("扫描完成，发现 %d 个插件" % discovered_plugins.size())
 
 
@@ -126,29 +167,97 @@ func _scan_directory(path: String) -> void:
 
 func _read_plugin(cfg_path: String, directory: String) -> void:
     var config := ConfigFile.new()
-    var error := config.load(cfg_path)
+    var error: int = config.load(cfg_path)
     if error != OK:
         _log("配置读取失败：" + cfg_path)
         return
 
-    var dependencies: Variant = config.get_value(
-        "plugin_factory", "dependencies", []
-    )
+    var dependencies: Variant = config.get_value("plugin_factory", "dependencies", [])
+    var conflicts: Variant = config.get_value("plugin_factory", "conflicts", [])
+
     if not (dependencies is Array or dependencies is PackedStringArray):
         dependencies = []
+    if not (conflicts is Array or conflicts is PackedStringArray):
+        conflicts = []
+
+    var folder_name := directory.get_file()
+    for existing in discovered_plugins:
+        if str(existing.get("directory", "")) == directory:
+            return
 
     discovered_plugins.append({
-        "name": str(config.get_value("plugin", "name", directory.get_file())),
+        "name": str(config.get_value("plugin", "name", folder_name)),
         "version": str(config.get_value("plugin", "version", "未知")),
+        "description": str(config.get_value("plugin", "description", "暂无描述")),
+        "author": str(config.get_value("plugin", "author", "未知")),
         "directory": directory,
-        "dependencies": dependencies
+        "folder": folder_name,
+        "config_path": cfg_path,
+        "dependencies": dependencies,
+        "conflicts": conflicts
     })
+
+
+func _apply_filter(query: String = "") -> void:
+    if not is_instance_valid(plugin_list):
+        return
+
+    plugin_list.clear()
+    visible_plugins.clear()
+    var needle := query.strip_edges().to_lower()
+
+    for plugin in discovered_plugins:
+        var searchable := "%s %s %s %s" % [
+            str(plugin.get("name", "")),
+            str(plugin.get("folder", "")),
+            str(plugin.get("version", "")),
+            str(plugin.get("description", ""))
+        ]
+        if needle.is_empty() or searchable.to_lower().contains(needle):
+            visible_plugins.append(plugin)
+            var index := plugin_list.add_item(
+                "%s  |  %s" % [str(plugin.get("name", "未命名")), str(plugin.get("version", "未知"))]
+            )
+            plugin_list.set_item_metadata(index, plugin)
+
+    status_label.text = "显示 %d / %d 个插件" % [visible_plugins.size(), discovered_plugins.size()]
+
+
+func _show_plugin_details(index: int) -> void:
+    if index < 0 or index >= visible_plugins.size():
+        return
+
+    var plugin: Dictionary = visible_plugins[index]
+    var dependencies: Array = []
+    var conflicts: Array = []
+    for item in plugin.get("dependencies", []):
+        dependencies.append(str(item))
+    for item in plugin.get("conflicts", []):
+        conflicts.append(str(item))
+
+    details_view.text = (
+        "名称：%s\n版本：%s\n作者：%s\n目录：%s\n说明：%s\n依赖：%s\n冲突：%s"
+        % [
+            str(plugin.get("name", "")),
+            str(plugin.get("version", "")),
+            str(plugin.get("author", "")),
+            str(plugin.get("directory", "")),
+            str(plugin.get("description", "")),
+            "、".join(dependencies) if not dependencies.is_empty() else "无",
+            "、".join(conflicts) if not conflicts.is_empty() else "无"
+        ]
+    )
 
 
 func _select_all() -> void:
     for i in range(plugin_list.item_count):
-        plugin_list.select(i, false)
-    status_label.text = "已选择全部插件"
+        plugin_list.select(i)
+    status_label.text = "已选择当前显示的 %d 个插件" % plugin_list.item_count
+
+
+func _clear_selection() -> void:
+    plugin_list.deselect_all()
+    status_label.text = "已清空选择"
 
 
 func _get_selected_plugins() -> Array[Dictionary]:
@@ -160,17 +269,38 @@ func _get_selected_plugins() -> Array[Dictionary]:
     return result
 
 
+func _check_selected() -> void:
+    var selected := _get_selected_plugins()
+    if selected.is_empty():
+        status_label.text = "请先选择插件"
+        return
+
+    var valid := _check_dependencies(selected)
+    if valid:
+        status_label.text = "检查通过：所选插件没有已声明的依赖缺失或冲突"
+        _log("依赖与冲突检查通过")
+    else:
+        status_label.text = "检查发现问题，请查看操作日志"
+
+
 func _check_dependencies(selected: Array[Dictionary]) -> bool:
     var selected_names: Array[String] = []
     for plugin in selected:
-        selected_names.append(str(plugin.directory.get_file()))
+        selected_names.append(str(plugin.get("folder", "")))
 
     var valid := true
     for plugin in selected:
-        for dependency in plugin.dependencies:
+        var plugin_name := str(plugin.get("name", "未命名"))
+        for dependency in plugin.get("dependencies", []):
             if str(dependency) not in selected_names:
-                _log("依赖缺失：%s 需要 %s" % [plugin.name, str(dependency)])
+                _log("依赖缺失：%s 需要 %s" % [plugin_name, str(dependency)])
                 valid = false
+
+        for conflict in plugin.get("conflicts", []):
+            if str(conflict) in selected_names:
+                _log("插件冲突：%s 与 %s 不能同时组合" % [plugin_name, str(conflict)])
+                valid = false
+
     return valid
 
 
@@ -182,7 +312,7 @@ func _combine_selected() -> void:
 
     _log("开始检查所选插件")
     if not _check_dependencies(selected):
-        status_label.text = "依赖不完整，请查看日志"
+        status_label.text = "依赖或冲突检查未通过，请查看日志"
         return
 
     var zip: ZIPPacker = ZIPPacker.new()
@@ -203,15 +333,15 @@ func _combine_selected() -> void:
 
     var success := true
     for plugin in selected:
-        _log("正在打包：" + plugin.name)
-        manifest.plugins.append({
-            "name": plugin.name,
-            "version": plugin.version,
-            "directory": plugin.directory.get_file()
+        _log("正在打包：" + str(plugin.get("name", "未命名")))
+        manifest["plugins"].append({
+            "name": str(plugin.get("name", "")),
+            "version": str(plugin.get("version", "")),
+            "directory": str(plugin.get("folder", ""))
         })
 
-        var destination := "addons/" + str(plugin.directory.get_file())
-        if not _pack_directory(zip, plugin.directory, destination):
+        var destination := "addons/" + str(plugin.get("folder", ""))
+        if not _pack_directory(zip, str(plugin.get("directory", "")), destination):
             success = false
             break
 
@@ -244,7 +374,7 @@ func _pack_directory(zip: ZIPPacker, source: String, destination: String) -> boo
     var entry := dir.get_next()
 
     while entry != "":
-        if entry in EXCLUDED_DIRS or entry.ends_with(".tmp"):
+        if entry.begins_with(".") or entry in EXCLUDED_DIRS or entry.ends_with(".tmp"):
             entry = dir.get_next()
             continue
 
