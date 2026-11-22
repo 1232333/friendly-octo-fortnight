@@ -234,7 +234,8 @@ func _create_interface() -> void:
     panel.add_child(builder_status_label)
 
     builder_request = HTTPRequest.new()
-    builder_request.timeout = 900.0
+    builder_request.timeout = 0.0
+    builder_request.use_threads = true
     builder_request.request_completed.connect(_on_builder_request_completed)
     add_child(builder_request)
 
