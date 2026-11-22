@@ -50,6 +50,34 @@ std::vector<Token> tokenize(const std::string &line, std::string &error) {
             tokens.push_back({line.substr(start, i - start), true});
             continue;
         }
+        if (std::isdigit(c)) {
+            const std::size_t start = i++;
+            while (i < line.size() && std::isdigit(static_cast<unsigned char>(line[i]))) {
+                ++i;
+            }
+            if (i + 1 < line.size() && line[i] == '.' &&
+                std::isdigit(static_cast<unsigned char>(line[i + 1]))) {
+                ++i;
+                while (i < line.size() && std::isdigit(static_cast<unsigned char>(line[i]))) {
+                    ++i;
+                }
+            }
+            if (i < line.size() && (line[i] == 'e' || line[i] == 'E')) {
+                const std::size_t exponent = i++;
+                if (i < line.size() && (line[i] == '+' || line[i] == '-')) {
+                    ++i;
+                }
+                const std::size_t digits = i;
+                while (i < line.size() && std::isdigit(static_cast<unsigned char>(line[i]))) {
+                    ++i;
+                }
+                if (digits == i) {
+                    i = exponent;
+                }
+            }
+            tokens.push_back({line.substr(start, i - start), false});
+            continue;
+        }
         if (is_ascii_word(c) || c >= 0x80) {
             const std::size_t start = i++;
             while (i < line.size()) {
