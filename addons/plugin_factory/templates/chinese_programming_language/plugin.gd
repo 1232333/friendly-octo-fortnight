@@ -40,7 +40,7 @@ func _build_screen() -> void:
     screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
     var title := Label.new()
-    title.text = "中文原生编程语言 0.3.0 · ZHBC VM"
+    title.text = "中文原生编程语言 0.4.0 · ZHBC VM"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     screen.add_child(title)
     var help := Label.new()
@@ -51,7 +51,7 @@ func _build_screen() -> void:
     source_editor.size_flags_vertical = Control.SIZE_EXPAND_FILL
     source_editor.custom_minimum_size = Vector2(0, 220)
     source_editor.placeholder_text = "输入中文程序……"
-    source_editor.text = "变量 分数: 整数 = 80\n打印(\"分数：\", 分数)\n如果 分数 >= 60:\n    打印(\"及格\")\n否则:\n    打印(\"不及格\")\n结束\n"
+    source_editor.text = _load_initial_source()
     screen.add_child(source_editor)
     var compile_button := Button.new()
     compile_button.text = "编译并运行（原生 VM）"
@@ -69,6 +69,16 @@ func _build_screen() -> void:
     output_editor.placeholder_text = "VM 执行输出 / 错误"
     screen.add_child(output_editor)
 
+func _load_initial_source() -> String:
+    if FileAccess.file_exists(SOURCE_PATH):
+        var file := FileAccess.open(SOURCE_PATH, FileAccess.READ)
+        if file != null:
+            var saved_source := file.get_as_text()
+            file.close()
+            return saved_source
+    return "变量 分数: 整数 = 80\\n打印(\\\"分数：\\\", 分数)\\n如果 分数 >= 60:\\n    打印(\\\"及格\\\")\\n否则:\\n    打印(\\\"不及格\\\")\\n结束\\n"
+
+
 func _compile_source() -> void:
     if not ClassDB.class_exists("ChineseLanguage"):
         status_label.text = "原生中文 VM 尚未加载。请先编译并安装 C++ 扩展。"
@@ -78,8 +88,13 @@ func _compile_source() -> void:
         status_label.text = "无法创建原生中文语言实例"
         return
     var result: Variant = compiler.call("compile", source_editor.text)
-    if not (result is Dictionary) or not bool(result.get("ok", false)):
-        status_label.text = "编译失败：" + str(result.get("error", "编译器返回格式错误"))
+    if not (result is Dictionary):
+        status_label.text = "编译失败：原生编译器返回格式错误"
+        output_editor.text = ""
+        compiler = null
+        return
+    if not bool(result.get("ok", false)):
+        status_label.text = "编译失败：" + str(result.get("error", "未知编译错误"))
         output_editor.text = ""
         compiler = null
         return
