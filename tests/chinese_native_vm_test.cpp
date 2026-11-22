@@ -12,6 +12,11 @@ int main(){
  chinese::Bytecode decoded;std::string err;require(chinese::Bytecode::decode(bytes,decoded,err),"decode bytecode");
  auto r=vm.run(decoded);require(r.ok,"VM executes bytecode");require(r.output=="分数： 80\n及格\n","expected VM output");
 
+ auto fn_source=std::string("函数 加法(a: 整数, b: 整数) -> 整数:\n返回 a + b\n结束\n变量 结果 = 加法(20, 22)\n打印(结果)\n");
+ auto fn_compiled=f.compile(fn_source);if(!fn_compiled.ok)std::cerr<<"FUNCTION COMPILE ERROR: "<<fn_compiled.error<<"\n";require(fn_compiled.ok,"compile typed native function");
+ auto fn_bytes=fn_compiled.bytecode.encode();chinese::Bytecode fn_decoded;require(chinese::Bytecode::decode(fn_bytes,fn_decoded,err),"decode function bytecode");require(fn_decoded.functions.size()==1,"function table serialized");auto fn_result=vm.run(fn_decoded);require(fn_result.ok,"VM executes native function call");require(fn_result.output=="42\n","function returns value to caller");
+ auto bad_fn_args=f.compile("函数 求和(a: 整数) -> 整数:\n返回 a\n结束\n打印(求和(1, 2))\n");require(!bad_fn_args.ok,"function argument count checked");
+ auto bad_fn_type=f.compile("函数 求和(a: 整数) -> 整数:\n返回 a\n结束\n打印(求和(\"文字\"))\n");require(!bad_fn_type.ok,"function argument type checked");
  auto wrong_integer=f.compile("变量 生命值: 整数 = \"满血\"\n");require(!wrong_integer.ok,"string cannot initialize integer");
  auto wrong_type=f.compile("变量 标记: 颜色 = 3\n");require(!wrong_type.ok,"unknown type name rejected");
  auto wrong_math=f.compile("变量 结果 = \"文字\" - 2\n");require(!wrong_math.ok,"invalid arithmetic types rejected");
