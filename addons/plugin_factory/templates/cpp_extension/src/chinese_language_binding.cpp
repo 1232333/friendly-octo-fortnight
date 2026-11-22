@@ -140,7 +140,10 @@ void ChineseProgram::_initialize_runtime() {
 void ChineseProgram::_ready() { _initialize_runtime(); }
 void ChineseProgram::_process(double delta) {
     if (!has_process_event || runtime.is_null()) return;
-    Dictionary result = runtime->run(bytecode, get_tree() != nullptr && get_tree()->get_current_scene() != nullptr ? get_tree()->get_current_scene() : this, String("每帧"), delta);
+    SceneTree *tree = get_tree();
+    Node *scene_root = tree != nullptr ? tree->get_current_scene() : nullptr;
+    if (scene_root == nullptr) scene_root = this;
+    Dictionary result = runtime->run(bytecode, scene_root, String("每帧"), delta);
     if (!bool(result.get("ok", false))) {
         UtilityFunctions::push_error(String("中文事件“每帧”执行失败：") + String(result.get("error", "")));
         set_process(false);
