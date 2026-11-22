@@ -203,6 +203,10 @@ CompileResult Compiler::compile(const std::string &source) const {
     std::string line;
     int line_number = 0;
     int indent = 0;
+    // Bare top-level statements are executable code, not class members.
+    // Route them through _ready() unless the source already declares that event.
+    const bool has_explicit_ready = source.find("当 游戏开始") != std::string::npos;
+    bool implicit_ready_open = false;
 
     while (std::getline(input, line)) {
         ++line_number;
@@ -222,6 +226,20 @@ CompileResult Compiler::compile(const std::string &source) const {
         }
 
         const std::string &first = tokens[0].value;
+
+        // Close the implicit _ready() before emitting class-level functions/events.
+        if ((first == "当" || first == "函数") && implicit_ready_open && blocks.empty()) {
+            indent = 0;
+            implicit_ready_open = false;
+        }
+        // A plain Chinese script (变量/打印/如果/赋值...) must execute when
+        // the attached node enters the scene tree, rather than at class scope.
+        if (indent == 0 && !has_explicit_ready && first != "当" && first != "函数") {
+            output << "func _ready():\n";
+            indent = 1;
+            implicit_ready_open = true;
+        }
+
         if (first == "结束") {
             if (blocks.empty()) {
                 result.error = "第 " + std::to_string(line_number) + " 行：多余的“结束”";
