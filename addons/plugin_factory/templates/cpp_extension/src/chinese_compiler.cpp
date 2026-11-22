@@ -149,6 +149,28 @@ std::string expression(const std::vector<Token> &tokens, std::size_t start) {
             output += "or";
         } else if (value == "不") {
             output += "not";
+        } else if (value == "自身") {
+            output += "self";
+        } else if (value == "输入") {
+            output += "Input";
+        } else if (value == "获取节点") {
+            output += "get_node";
+        } else if (value == "获取节点或空") {
+            output += "get_node_or_null";
+        } else if (value == "位置") {
+            output += "position";
+        } else if (value == "旋转") {
+            output += "rotation";
+        } else if (value == "缩放") {
+            output += "scale";
+        } else if (value == "可见") {
+            output += "visible";
+        } else if (value == "名称") {
+            output += "name";
+        } else if (value == "正在按下") {
+            output += "is_action_pressed";
+        } else if (value == "移动并滑动") {
+            output += "move_and_slide";
         } else if (value == "&&") {
             output += "and";
         } else if (value == "||") {
@@ -235,6 +257,49 @@ CompileResult Compiler::compile(const std::string &source) const {
             output << (first == "如果" ? "if " : "while ")
                    << expression(condition, 1) << ":\n";
             blocks.push_back(first == "如果" ? "if" : "loop");
+            ++indent;
+            continue;
+        }
+
+        if (first == "当") {
+            if (tokens.size() < 3) {
+                result.error = "第 " + std::to_string(line_number) + " 行：事件格式不完整";
+                return result;
+            }
+            const std::string event_name = tokens[1].value;
+            std::string method_name;
+            if (event_name == "游戏开始") {
+                method_name = "_ready";
+            } else if (event_name == "每帧") {
+                method_name = "_process";
+            } else if (event_name == "物理帧") {
+                method_name = "_physics_process";
+            } else if (event_name == "输入事件") {
+                method_name = "_input";
+            } else if (event_name == "退出场景") {
+                method_name = "_exit_tree";
+            } else {
+                result.error = "第 " + std::to_string(line_number) + " 行：不支持的事件“" + event_name + "”";
+                return result;
+            }
+            output << "func " << method_name << "(";
+            if (tokens.size() > 3 && tokens[2].value == "(") {
+                bool first_argument = true;
+                for (std::size_t i = 3; i < tokens.size() && tokens[i].value != ")"; ++i) {
+                    if (tokens[i].value == ",") {
+                        output << ", ";
+                        first_argument = true;
+                    } else {
+                        if (!first_argument) {
+                            output << ", ";
+                        }
+                        output << mangle_identifier(tokens[i].value);
+                        first_argument = false;
+                    }
+                }
+            }
+            output << "):\n";
+            blocks.push_back("function");
             ++indent;
             continue;
         }
