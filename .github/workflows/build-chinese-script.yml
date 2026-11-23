@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - "ChineseScript_M1_Godot44/**"
+      - "ChineseScript_M1_Godot44.zip"
       - ".github/workflows/build-chinese-script.yml"
 
 permissions:
@@ -20,7 +21,14 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build
+          sudo apt-get install -y build-essential cmake ninja-build unzip
+
+      - name: Extract source archive if present
+        shell: bash
+        run: |
+          if [[ -f ChineseScript_M1_Godot44.zip && ! -d ChineseScript_M1_Godot44 ]]; then
+            unzip -q ChineseScript_M1_Godot44.zip
+          fi
 
       - name: Locate project
         id: project
@@ -31,7 +39,7 @@ jobs:
           elif [[ -f ChineseScript_M1_Godot44/CMakeLists.txt ]]; then
             echo "dir=ChineseScript_M1_Godot44" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::Missing CMakeLists.txt. Upload/extract ChineseScript_M1_Godot44 source into the repository first."
+            echo "::error::Missing source. Add ChineseScript_M1_Godot44.zip to the repository root or commit the extracted project folder."
             exit 1
           fi
 
@@ -45,7 +53,7 @@ jobs:
 
       - name: Compile
         working-directory: ${{ steps.project.outputs.dir }}
-        run: cmake --build build --parallel 2>&1 | tee build.log
+        run: set -o pipefail && cmake --build build --parallel 2>&1 | tee build.log
 
       - name: Package build output
         if: always()
@@ -59,8 +67,8 @@ jobs:
           if [[ -f "$PROJECT_DIR/build.log" ]]; then
             cp "$PROJECT_DIR/build.log" dist/
           fi
-          if [[ -d "$PROJECT_DIR/build" ]]; then
-            cp "$PROJECT_DIR/build/CMakeCache.txt" dist/ 2>/dev/null || true
+          if [[ -f "$PROJECT_DIR/build/CMakeCache.txt" ]]; then
+            cp "$PROJECT_DIR/build/CMakeCache.txt" dist/
           fi
 
       - name: Upload build artifacts
