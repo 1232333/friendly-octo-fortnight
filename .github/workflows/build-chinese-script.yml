@@ -1,0 +1,73 @@
+name: ChineseScript M1 Linux Build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "ChineseScript_M1_Godot44/**"
+      - ".github/workflows/build-chinese-script.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build
+
+      - name: Locate project
+        id: project
+        shell: bash
+        run: |
+          if [[ -f CMakeLists.txt ]]; then
+            echo "dir=." >> "$GITHUB_OUTPUT"
+          elif [[ -f ChineseScript_M1_Godot44/CMakeLists.txt ]]; then
+            echo "dir=ChineseScript_M1_Godot44" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Missing CMakeLists.txt. Upload/extract ChineseScript_M1_Godot44 source into the repository first."
+            exit 1
+          fi
+
+      - name: Fetch godot-cpp 4.4
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: git clone --depth 1 --branch 4.4 https://github.com/godotengine/godot-cpp.git godot-cpp
+
+      - name: Configure
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Compile
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: cmake --build build --parallel 2>&1 | tee build.log
+
+      - name: Package build output
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p dist
+          PROJECT_DIR="${{ steps.project.outputs.dir }}"
+          if [[ -f "$PROJECT_DIR/addons/chinese_script_language/bin/libchinese_script.so" ]]; then
+            cp "$PROJECT_DIR/addons/chinese_script_language/bin/libchinese_script.so" dist/
+          fi
+          if [[ -f "$PROJECT_DIR/build.log" ]]; then
+            cp "$PROJECT_DIR/build.log" dist/
+          fi
+          if [[ -d "$PROJECT_DIR/build" ]]; then
+            cp "$PROJECT_DIR/build/CMakeCache.txt" dist/ 2>/dev/null || true
+          fi
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChineseScript-M1-Linux-x86_64
+          path: dist/
+          if-no-files-found: warn
+          retention-days: 14
