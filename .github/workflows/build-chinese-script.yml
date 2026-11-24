@@ -43,7 +43,7 @@ jobs:
             exit 1
           fi
 
-      - name: Fix Godot 4.4 typed array signatures
+      - name: Fix Godot 4.7 typed array signatures
         working-directory: ${{ steps.project.outputs.dir }}
         shell: bash
         run: |
@@ -72,7 +72,7 @@ jobs:
               raise SystemExit(f"Missing language header: {header}")
           source = header.read_text(encoding="utf-8")
           class_pattern = re.compile(
-              r"(class\\s+ChineseLanguage\\s*:\\s*public\\s+(?:godot::)?ScriptLanguageExtension\\s*\\{)"
+              r"(class\s+ChineseLanguage\s*:\s*public\s+(?:godot::)?ScriptLanguageExtension\s*\\{)"
           )
           match = class_pattern.search(source)
           if not match:
@@ -92,11 +92,11 @@ jobs:
           if "_reload_all_scripts" not in class_body:
               source = (
                   source[:class_start]
-                  + "\\npublic:\\n    // M1 has no hot-reload implementation yet; provide the required Godot virtual.\\n"
-                  + "    void _reload_all_scripts() override {}\\n"
+                  + "\npublic:\n    // M1 has no hot-reload implementation yet; provide the required Godot virtual.\n"
+                  + "    void _reload_all_scripts() override {}\n"
                   + source[class_start:]
               )
-              header.write_text(source, encoding="utf-8", newline="\\n")
+              header.write_text(source, encoding="utf-8", newline="\n")
               print("Added ChineseLanguage::_reload_all_scripts() override")
           else:
               print("ChineseLanguage already overrides _reload_all_scripts()")
@@ -201,7 +201,7 @@ jobs:
               raise SystemExit(f"Missing language header: {header}")
           source = header.read_text(encoding="utf-8")
           class_pattern = re.compile(
-              r"(class\\s+ChineseLanguage\\s*:\\s*public\\s+(?:godot::)?ScriptLanguageExtension\\s*\\{)"
+              r"(class\s+ChineseLanguage\s*:\s*public\s+(?:godot::)?ScriptLanguageExtension\s*\\{)"
           )
           match = class_pattern.search(source)
           if not match:
@@ -221,11 +221,11 @@ jobs:
           if "_reload_all_scripts" not in class_body:
               source = (
                   source[:class_start]
-                  + "\\npublic:\\n    // M1 has no hot-reload implementation yet; provide the required Godot virtual.\\n"
-                  + "    void _reload_all_scripts() override {}\\n"
+                  + "\npublic:\n    // M1 has no hot-reload implementation yet; provide the required Godot virtual.\n"
+                  + "    void _reload_all_scripts() override {}\n"
                   + source[class_start:]
               )
-              header.write_text(source, encoding="utf-8", newline="\\n")
+              header.write_text(source, encoding="utf-8", newline="\n")
               print("Added ChineseLanguage::_reload_all_scripts() override")
           else:
               print("ChineseLanguage already overrides _reload_all_scripts()")
@@ -235,7 +235,7 @@ jobs:
         working-directory: ${{ steps.project.outputs.dir }}
         run: git clone --depth 1 --branch 4.7 https://github.com/godotengine/godot-cpp.git godot-cpp
 
-      - name: Fix Godot 4.4 typed array signatures
+      - name: Fix Godot 4.7 typed array signatures
         working-directory: ${{ steps.project.outputs.dir }}
         shell: bash
         run: |
