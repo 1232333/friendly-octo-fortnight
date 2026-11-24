@@ -43,6 +43,15 @@ jobs:
             exit 1
           fi
 
+      - name: Fix Godot 4.4 typed array signatures
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          # Godot 4.4 ScriptExtension returns TypedArray<Dictionary>, not Array<Dictionary>.
+          grep -RIl 'Array<Dictionary>' src --include='*.h' --include='*.cpp' | while read -r file; do
+            sed -i 's/Array<Dictionary>/TypedArray<Dictionary>/g' "$file"
+          done
+
       - name: Fetch godot-cpp 4.4
         working-directory: ${{ steps.project.outputs.dir }}
         run: git clone --depth 1 --branch 4.4 https://github.com/godotengine/godot-cpp.git godot-cpp
