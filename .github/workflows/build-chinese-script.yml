@@ -43,6 +43,36 @@ jobs:
             exit 1
           fi
 
+      - name: Resolve Godot 4.7 virtual method hashes
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          roots = [Path("godot-cpp/gen/src/classes"), Path("godot-cpp/src/classes")]
+          files = [p for root in roots if root.exists() for p in root.rglob("*script_language_extension*.cpp")]
+          if not files:
+              raise SystemExit("Could not find generated ScriptLanguageExtension C++ binding")
+          text = "\\n".join(p.read_text(encoding="utf-8") for p in files)
+          def get_hash(method):
+              pattern = rf"BIND_VIRTUAL_METHOD\\(ScriptLanguageExtension,\\s*{re.escape(method)},\\s*(0x[0-9A-Fa-f]+|[0-9]+)\\s*\\)"
+              match = re.search(pattern, text)
+              if not match:
+                  raise SystemExit(f"Could not find Godot API hash for {method}")
+              return match.group(1)
+
+          source = Path("src/language/chinese_language.cpp")
+          cpp = source.read_text(encoding="utf-8")
+          cpp = cpp.replace("__HASH_RELOAD__", get_hash("_reload_all_scripts"))
+          cpp = cpp.replace("__HASH_TYPE__", get_hash("_handles_global_class_type"))
+          if "__HASH_" in cpp:
+              raise SystemExit("Unresolved virtual method hash placeholder")
+          source.write_text(cpp, encoding="utf-8", newline="\\n")
+          print("Resolved native virtual method hashes from godot-cpp generated bindings")
+          PY
+
       - name: Fix ScriptLanguageExtension typed array signatures
         working-directory: ${{ steps.project.outputs.dir }}
         shell: bash
@@ -107,8 +137,8 @@ jobs:
                   h = h[:pos] + "\n" + declaration + "\n" + h[pos:]
 
           cpp = source_cpp.read_text(encoding="utf-8")
-          bind_reload = "BIND_VIRTUAL_METHOD(ChineseLanguage, _reload_all_scripts, _gdvirtual__reload_all_scripts_get_method_info().get_compatibility_hash());"
-          bind_type = "BIND_VIRTUAL_METHOD(ChineseLanguage, _handles_global_class_type, _gdvirtual__handles_global_class_type_get_method_info().get_compatibility_hash());"
+          bind_reload = "BIND_VIRTUAL_METHOD(ChineseLanguage, _reload_all_scripts, __HASH_RELOAD__);"
+          bind_type = "BIND_VIRTUAL_METHOD(ChineseLanguage, _handles_global_class_type, __HASH_TYPE__);"
           match = re.search(r"void\s+ChineseLanguage::_bind_methods\s*\(\s*\)\s*\{", cpp)
           if not match:
               raise SystemExit("Could not find ChineseLanguage::_bind_methods() in source")
@@ -127,9 +157,11 @@ jobs:
               cpp = cpp[:brace] + "\n" + "\n".join(insertions) + cpp[brace:]
 
           if "void ChineseLanguage::_reload_all_scripts()" not in cpp:
-              cpp += "\n\nvoid ChineseLanguage::_reload_all_scripts() {\n}\n"
-          if "bool ChineseLanguage::_handles_global_class_type(" not in cpp:
-              cpp += "\n\nbool ChineseLanguage::_handles_global_class_type(const String &type) const {\n    return false;\n}\n"
+              definitions = "\n\nvoid ChineseLanguage::_reload_all_scripts() {\n}\n\nbool ChineseLanguage::_handles_global_class_type(const String &type) const {\n    return false;\n}\n"
+              namespace_end = cpp.rfind("} // namespace godot")
+              if namespace_end < 0:
+                  raise SystemExit("Could not find closing godot namespace in chinese_language.cpp")
+              cpp = cpp[:namespace_end] + definitions + cpp[namespace_end:]
 
           header.write_text(h, encoding="utf-8", newline="\n")
           source_cpp.write_text(cpp, encoding="utf-8", newline="\n")
@@ -274,8 +306,8 @@ jobs:
                   h = h[:pos] + "\n" + declaration + "\n" + h[pos:]
 
           cpp = source_cpp.read_text(encoding="utf-8")
-          bind_reload = "BIND_VIRTUAL_METHOD(ChineseLanguage, _reload_all_scripts, _gdvirtual__reload_all_scripts_get_method_info().get_compatibility_hash());"
-          bind_type = "BIND_VIRTUAL_METHOD(ChineseLanguage, _handles_global_class_type, _gdvirtual__handles_global_class_type_get_method_info().get_compatibility_hash());"
+          bind_reload = "BIND_VIRTUAL_METHOD(ChineseLanguage, _reload_all_scripts, __HASH_RELOAD__);"
+          bind_type = "BIND_VIRTUAL_METHOD(ChineseLanguage, _handles_global_class_type, __HASH_TYPE__);"
           match = re.search(r"void\s+ChineseLanguage::_bind_methods\s*\(\s*\)\s*\{", cpp)
           if not match:
               raise SystemExit("Could not find ChineseLanguage::_bind_methods() in source")
@@ -294,9 +326,11 @@ jobs:
               cpp = cpp[:brace] + "\n" + "\n".join(insertions) + cpp[brace:]
 
           if "void ChineseLanguage::_reload_all_scripts()" not in cpp:
-              cpp += "\n\nvoid ChineseLanguage::_reload_all_scripts() {\n}\n"
-          if "bool ChineseLanguage::_handles_global_class_type(" not in cpp:
-              cpp += "\n\nbool ChineseLanguage::_handles_global_class_type(const String &type) const {\n    return false;\n}\n"
+              definitions = "\n\nvoid ChineseLanguage::_reload_all_scripts() {\n}\n\nbool ChineseLanguage::_handles_global_class_type(const String &type) const {\n    return false;\n}\n"
+              namespace_end = cpp.rfind("} // namespace godot")
+              if namespace_end < 0:
+                  raise SystemExit("Could not find closing godot namespace in chinese_language.cpp")
+              cpp = cpp[:namespace_end] + definitions + cpp[namespace_end:]
 
           header.write_text(h, encoding="utf-8", newline="\n")
           source_cpp.write_text(cpp, encoding="utf-8", newline="\n")
@@ -306,6 +340,36 @@ jobs:
       - name: Fetch latest godot-cpp (master)
         working-directory: ${{ steps.project.outputs.dir }}
         run: git clone --depth 1 --branch master https://github.com/godotengine/godot-cpp.git godot-cpp
+
+      - name: Resolve Godot 4.7 virtual method hashes
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          roots = [Path("godot-cpp/gen/src/classes"), Path("godot-cpp/src/classes")]
+          files = [p for root in roots if root.exists() for p in root.rglob("*script_language_extension*.cpp")]
+          if not files:
+              raise SystemExit("Could not find generated ScriptLanguageExtension C++ binding")
+          text = "\\n".join(p.read_text(encoding="utf-8") for p in files)
+          def get_hash(method):
+              pattern = rf"BIND_VIRTUAL_METHOD\\(ScriptLanguageExtension,\\s*{re.escape(method)},\\s*(0x[0-9A-Fa-f]+|[0-9]+)\\s*\\)"
+              match = re.search(pattern, text)
+              if not match:
+                  raise SystemExit(f"Could not find Godot API hash for {method}")
+              return match.group(1)
+
+          source = Path("src/language/chinese_language.cpp")
+          cpp = source.read_text(encoding="utf-8")
+          cpp = cpp.replace("__HASH_RELOAD__", get_hash("_reload_all_scripts"))
+          cpp = cpp.replace("__HASH_TYPE__", get_hash("_handles_global_class_type"))
+          if "__HASH_" in cpp:
+              raise SystemExit("Unresolved virtual method hash placeholder")
+          source.write_text(cpp, encoding="utf-8", newline="\\n")
+          print("Resolved native virtual method hashes from godot-cpp generated bindings")
+          PY
 
       - name: Fix ScriptLanguageExtension typed array signatures
         working-directory: ${{ steps.project.outputs.dir }}
