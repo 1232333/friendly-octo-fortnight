@@ -301,9 +301,11 @@ jobs:
               raise SystemExit("GDExtension manifest has no [libraries] section")
           head, tail = s.split("[libraries]", 1)
           for entry in entries:
-              if entry.split(" = ")[0] not in tail:
-                  tail = entry + "\n" + tail
-          p.write_text(head + "[libraries]" + tail, encoding="utf-8")
+              key = entry.split(" = ", 1)[0]
+              lines = [line.strip() for line in tail.splitlines()]
+              if key not in [line.split(" = ", 1)[0] for line in lines if " = " in line]:
+                  tail = entry + "\n" + tail.lstrip("\n")
+          p.write_text(head + "[libraries]\n" + tail.lstrip("\n"), encoding="utf-8", newline="\n")
           PY
 
       - name: Package Android build output
@@ -312,13 +314,13 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist-android
+          if [[ -d addons/chinese_script_language ]]; then
+            mkdir -p dist-android/addons
+            cp -a addons/chinese_script_language dist-android/addons/
+          fi
           if [[ -f addons/chinese_script_language/bin/libchinese_script.so ]]; then
-            cp addons/chinese_script_language/bin/libchinese_script.so dist-android/
             file addons/chinese_script_language/bin/libchinese_script.so | tee dist-android/binary-info.txt
             readelf -h addons/chinese_script_language/bin/libchinese_script.so >> dist-android/binary-info.txt
-          fi
-          if [[ -f addons/chinese_script_language/chinese_script.gdextension ]]; then
-            cp addons/chinese_script_language/chinese_script.gdextension dist-android/
           fi
           if [[ -f build-android.log ]]; then cp build-android.log dist-android/; fi
           if [[ -f build-android/CMakeCache.txt ]]; then cp build-android/CMakeCache.txt dist-android/; fi
