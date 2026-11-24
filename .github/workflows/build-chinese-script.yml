@@ -95,3 +95,131 @@ jobs:
           path: dist/
           if-no-files-found: warn
           retention-days: 14
+
+  build-android:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build unzip file
+
+      - name: Extract source archive if present
+        shell: bash
+        run: |
+          if [[ -f ChineseScript_M1_Godot44.zip && ! -d ChineseScript_M1_Godot44 ]]; then
+            unzip -q ChineseScript_M1_Godot44.zip
+          fi
+
+      - name: Locate project
+        id: project
+        shell: bash
+        run: |
+          if [[ -f CMakeLists.txt ]]; then
+            echo "dir=." >> "$GITHUB_OUTPUT"
+          elif [[ -f ChineseScript_M1_Godot44/CMakeLists.txt ]]; then
+            echo "dir=ChineseScript_M1_Godot44" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Missing ChineseScript M1 source archive or project folder."
+            exit 1
+          fi
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install "ndk;27.2.12479018"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Fetch godot-cpp 4.4
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: git clone --depth 1 --branch 4.4 https://github.com/godotengine/godot-cpp.git godot-cpp
+
+      - name: Fix Godot 4.4 typed array signatures
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          grep -RIl 'Array<Dictionary>' src --include='*.h' --include='*.cpp' | while read -r file; do
+            sed -i 's/Array<Dictionary>/TypedArray<Dictionary>/g' "$file"
+          done
+
+      - name: Add missing PackedStringArray include
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          if ! grep -q 'godot_cpp/variant/packed_string_array.hpp' src/frontend/m1_parser.cpp; then
+            sed -i '1i #include <godot_cpp/variant/packed_string_array.hpp>' src/frontend/m1_parser.cpp
+          fi
+
+      - name: Configure Android ARM64
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          cmake -S . -B build-android -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DANDROID_STL=c++_static \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DGODOTCPP_TARGET=template_debug
+
+      - name: Compile Android ARM64
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: set -o pipefail && cmake --build build-android --parallel 2>&1 | tee build-android.log
+
+      - name: Add Android entries to GDExtension manifest
+        if: always()
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("addons/chinese_script_language/chinese_script.gdextension")
+          if not p.exists():
+              raise SystemExit(f"Missing GDExtension manifest: {p}")
+          s = p.read_text(encoding="utf-8")
+          entries = (
+              'android.debug.arm64 = "res://addons/chinese_script_language/bin/libchinese_script.so"',
+              'android.release.arm64 = "res://addons/chinese_script_language/bin/libchinese_script.so"',
+          )
+          if "[libraries]" not in s:
+              raise SystemExit("GDExtension manifest has no [libraries] section")
+          head, tail = s.split("[libraries]", 1)
+          for entry in entries:
+              if entry.split(" = ")[0] not in tail:
+                  tail = entry + "\\n" + tail
+          p.write_text(head + "[libraries]" + tail, encoding="utf-8")
+          PY
+
+      - name: Package Android build output
+        if: always()
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          mkdir -p dist-android
+          if [[ -f addons/chinese_script_language/bin/libchinese_script.so ]]; then
+            cp addons/chinese_script_language/bin/libchinese_script.so dist-android/
+            file addons/chinese_script_language/bin/libchinese_script.so | tee dist-android/binary-info.txt
+            readelf -h addons/chinese_script_language/bin/libchinese_script.so >> dist-android/binary-info.txt
+          fi
+          if [[ -f addons/chinese_script_language/chinese_script.gdextension ]]; then
+            cp addons/chinese_script_language/chinese_script.gdextension dist-android/
+          fi
+          if [[ -f build-android.log ]]; then cp build-android.log dist-android/; fi
+          if [[ -f build-android/CMakeCache.txt ]]; then cp build-android/CMakeCache.txt dist-android/; fi
+
+      - name: Upload Android ARM64 artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChineseScript-M1-Android-arm64-v8a
+          path: ${{ steps.project.outputs.dir }}/dist-android/
+          if-no-files-found: warn
+          retention-days: 14
