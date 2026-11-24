@@ -43,7 +43,7 @@ jobs:
             exit 1
           fi
 
-      - name: Fix Godot 4.7 typed array signatures
+      - name: Fix ScriptLanguageExtension typed array signatures
         working-directory: ${{ steps.project.outputs.dir }}
         shell: bash
         run: |
@@ -59,7 +59,7 @@ jobs:
           # string.hpp only forward-declares PackedStringArray; this translation unit instantiates it.
           sed -i '1i #include <godot_cpp/variant/packed_string_array.hpp>' src/frontend/m1_parser.cpp
 
-      - name: Implement required Godot 4.7 script-language virtual
+      - name: Implement required ScriptLanguageExtension virtual
         working-directory: ${{ steps.project.outputs.dir }}
         shell: bash
         run: |
@@ -102,9 +102,9 @@ jobs:
               print("ChineseLanguage already overrides _reload_all_scripts()")
           PY
 
-      - name: Fetch godot-cpp 4.7
+      - name: Fetch latest godot-cpp (master)
         working-directory: ${{ steps.project.outputs.dir }}
-        run: git clone --depth 1 --branch 4.7 https://github.com/godotengine/godot-cpp.git godot-cpp
+        run: git clone --depth 1 --branch master https://github.com/godotengine/godot-cpp.git godot-cpp
 
       - name: Configure
         working-directory: ${{ steps.project.outputs.dir }}
@@ -188,7 +188,7 @@ jobs:
           sdkmanager --install "ndk;27.2.12479018"
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
-      - name: Implement required Godot 4.7 script-language virtual
+      - name: Implement required ScriptLanguageExtension virtual
         working-directory: ${{ steps.project.outputs.dir }}
         shell: bash
         run: |
@@ -231,11 +231,11 @@ jobs:
               print("ChineseLanguage already overrides _reload_all_scripts()")
           PY
 
-      - name: Fetch godot-cpp 4.7
+      - name: Fetch latest godot-cpp (master)
         working-directory: ${{ steps.project.outputs.dir }}
-        run: git clone --depth 1 --branch 4.7 https://github.com/godotengine/godot-cpp.git godot-cpp
+        run: git clone --depth 1 --branch master https://github.com/godotengine/godot-cpp.git godot-cpp
 
-      - name: Fix Godot 4.7 typed array signatures
+      - name: Fix ScriptLanguageExtension typed array signatures
         working-directory: ${{ steps.project.outputs.dir }}
         shell: bash
         run: |
