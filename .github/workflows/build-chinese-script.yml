@@ -106,6 +106,13 @@ jobs:
         working-directory: ${{ steps.project.outputs.dir }}
         run: git clone --depth 1 --branch master https://github.com/godotengine/godot-cpp.git godot-cpp
 
+      - name: Adapt RefCounted script factory return
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          # New godot-cpp returns Ref<T> from memnew() for RefCounted classes.
+          sed -i 's/return memnew(ChineseScript);/return memnew(ChineseScript).ptr();/' src/language/chinese_language.cpp
+
       - name: Configure
         working-directory: ${{ steps.project.outputs.dir }}
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DGODOTCPP_API_VERSION=4.7
@@ -251,6 +258,13 @@ jobs:
             sed -i '1i #include <godot_cpp/variant/packed_string_array.hpp>' src/frontend/m1_parser.cpp
           fi
 
+      - name: Adapt RefCounted script factory return
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          # New godot-cpp returns Ref<T> from memnew() for RefCounted classes.
+          sed -i 's/return memnew(ChineseScript);/return memnew(ChineseScript).ptr();/' src/language/chinese_language.cpp
+
       - name: Configure Android ARM64
         working-directory: ${{ steps.project.outputs.dir }}
         shell: bash
@@ -261,7 +275,7 @@ jobs:
             -DANDROID_PLATFORM=android-24 \
             -DANDROID_STL=c++_static \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DGODOTCPP_TARGET=template_debug \\
+            -DGODOTCPP_TARGET=template_debug \
             -DGODOTCPP_API_VERSION=4.7
 
       - name: Compile Android ARM64
