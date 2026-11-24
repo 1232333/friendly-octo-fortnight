@@ -194,7 +194,7 @@ jobs:
           head, tail = s.split("[libraries]", 1)
           for entry in entries:
               if entry.split(" = ")[0] not in tail:
-                  tail = entry + "\\n" + tail
+                  tail = entry + "\n" + tail
           p.write_text(head + "[libraries]" + tail, encoding="utf-8")
           PY
 
