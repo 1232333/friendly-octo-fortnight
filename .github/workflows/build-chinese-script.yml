@@ -59,7 +59,7 @@ jobs:
           # string.hpp only forward-declares PackedStringArray; this translation unit instantiates it.
           sed -i '1i #include <godot_cpp/variant/packed_string_array.hpp>' src/frontend/m1_parser.cpp
 
-      - name: Implement required ScriptLanguageExtension virtual
+      - name: Implement required ScriptLanguageExtension virtuals
         working-directory: ${{ steps.project.outputs.dir }}
         shell: bash
         run: |
@@ -68,74 +68,57 @@ jobs:
           import re
 
           header = Path("src/language/chinese_language.h")
-          if not header.exists():
-              raise SystemExit(f"Missing language header: {header}")
-          source = header.read_text(encoding="utf-8")
-          class_pattern = re.compile(
-              r"(class\s+ChineseLanguage\s*:\s*public\s+(?:godot::)?ScriptLanguageExtension\s*\{)"
-          )
-          match = class_pattern.search(source)
-          if not match:
-              raise SystemExit("Could not locate ChineseLanguage : public ScriptLanguageExtension")
-          class_start = match.end()
-          depth = 1
-          i = class_start
-          while i < len(source) and depth:
-              if source[i] == "{":
-                  depth += 1
-              elif source[i] == "}":
-                  depth -= 1
-              i += 1
-          if depth:
-              raise SystemExit("Unbalanced ChineseLanguage class braces")
-          class_body = source[class_start:i - 1]
-          additions = []
-          changed = False
-          if "_reload_all_scripts" not in class_body:
-              additions.append("    void _reload_all_scripts() override {}")
-          if "_handles_global_class_type" not in class_body:
-              additions.append("    bool _handles_global_class_type(const String &type) const override { return false; }")
+          source_cpp = Path("src/language/chinese_language.cpp")
+          if not header.exists() or not source_cpp.exists():
+              raise SystemExit("Missing ChineseLanguage header or source")
 
+          h = header.read_text(encoding="utf-8")
+          include = "#include <godot_cpp/core/gdvirtual.gen.inc>"
+          if include not in h:
+              lines = h.splitlines()
+              insert_at = 1 if lines and lines[0].startswith("#pragma once") else 0
+              lines.insert(insert_at, include)
+              h = "\n".join(lines) + "\n"
+
+          # Remove the incorrect C++ override / inline binding patch from earlier builds, if present.
+          h = re.sub(r"^\s*void _reload_all_scripts\(\) override \{\}\s*\n", "", h, flags=re.M)
+          h = re.sub(r"^\s*bool _handles_global_class_type\(const String &type\) const override \{ return false; \}\s*\n", "", h, flags=re.M)
+          h = re.sub(
+              r"^\s*static void _bind_methods\(\)\s*\{\s*GDVIRTUAL_BIND\(_reload_all_scripts\);\s*GDVIRTUAL_BIND\(_handles_global_class_type, \"type\"\);\s*\}\s*\n",
+              "",
+              h,
+              flags=re.M,
+          )
+
+          declarations = [
+              "    GDVIRTUAL0(_reload_all_scripts);",
+              "    GDVIRTUAL1RC(bool, _handles_global_class_type, const String &);",
+          ]
+          for declaration in declarations:
+              if declaration.strip() not in h:
+                  pos = h.rfind("};")
+                  if pos < 0:
+                      raise SystemExit("Could not find end of ChineseLanguage class")
+                  h = h[:pos] + "\n" + declaration + "\n" + h[pos:]
+
+          cpp = source_cpp.read_text(encoding="utf-8")
           bind_reload = "GDVIRTUAL_BIND(_reload_all_scripts);"
-          bind_global_type = 'GDVIRTUAL_BIND(_handles_global_class_type, "type");'
-          bind_lines = []
-          if bind_reload not in class_body:
-              bind_lines.append(bind_reload)
-          if bind_global_type not in class_body:
-              bind_lines.append(bind_global_type)
+          bind_type = 'GDVIRTUAL_BIND(_handles_global_class_type, "type");'
+          match = re.search(r"void\s+ChineseLanguage::_bind_methods\s*\(\s*\)\s*\{", cpp)
+          if not match:
+              raise SystemExit("Could not find ChineseLanguage::_bind_methods() in source")
+          brace = cpp.find("{", match.start()) + 1
+          insertions = []
+          if bind_reload not in cpp:
+              insertions.append("    " + bind_reload)
+          if bind_type not in cpp:
+              insertions.append("    " + bind_type)
+          if insertions:
+              cpp = cpp[:brace] + "\n" + "\n".join(insertions) + cpp[brace:]
 
-          bind_block = (
-              "    static void _bind_methods() {\n"
-              + "".join("        " + line + "\n" for line in bind_lines)
-              + "    }"
-          )
-
-          # Register these virtual callbacks with Godot's GDExtension resolver.
-          bind_decl = re.search(r"static\s+void\s+_bind_methods\s*\(\s*\)\s*;", class_body)
-          bind_def = re.search(r"static\s+void\s+_bind_methods\s*\(\s*\)\s*\{", class_body)
-          if bind_decl and bind_lines:
-              a, b = bind_decl.span()
-              class_body = class_body[:a] + bind_block + class_body[b:]
-              changed = True
-          elif bind_def and bind_lines:
-              open_brace = class_body.find("{", bind_def.start())
-              class_body = class_body[:open_brace + 1] + (
-                  "\n" + "".join("        " + line + "\n" for line in bind_lines)
-              ) + class_body[open_brace + 1:]
-              changed = True
-          elif not bind_decl and not bind_def and bind_lines:
-              additions.append(bind_block)
-
-          if additions:
-              class_body = "\npublic:\n" + "\n".join(additions) + "\n" + class_body
-              changed = True
-
-          if changed:
-              source = source[:class_start] + class_body + source[i - 1:]
-              header.write_text(source, encoding="utf-8", newline="\n")
-              print("Added and registered required ScriptLanguageExtension virtuals")
-          else:
-              print("Required ScriptLanguageExtension virtuals already present")
+          header.write_text(h, encoding="utf-8", newline="\n")
+          source_cpp.write_text(cpp, encoding="utf-8", newline="\n")
+          print("Registered required virtual callbacks with GDVIRTUAL declarations and bindings")
           PY
 
       - name: Fetch latest godot-cpp (master)
@@ -231,7 +214,7 @@ jobs:
           sdkmanager --install "ndk;27.2.12479018"
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
-      - name: Implement required ScriptLanguageExtension virtual
+      - name: Implement required ScriptLanguageExtension virtuals
         working-directory: ${{ steps.project.outputs.dir }}
         shell: bash
         run: |
@@ -240,74 +223,57 @@ jobs:
           import re
 
           header = Path("src/language/chinese_language.h")
-          if not header.exists():
-              raise SystemExit(f"Missing language header: {header}")
-          source = header.read_text(encoding="utf-8")
-          class_pattern = re.compile(
-              r"(class\s+ChineseLanguage\s*:\s*public\s+(?:godot::)?ScriptLanguageExtension\s*\{)"
-          )
-          match = class_pattern.search(source)
-          if not match:
-              raise SystemExit("Could not locate ChineseLanguage : public ScriptLanguageExtension")
-          class_start = match.end()
-          depth = 1
-          i = class_start
-          while i < len(source) and depth:
-              if source[i] == "{":
-                  depth += 1
-              elif source[i] == "}":
-                  depth -= 1
-              i += 1
-          if depth:
-              raise SystemExit("Unbalanced ChineseLanguage class braces")
-          class_body = source[class_start:i - 1]
-          additions = []
-          changed = False
-          if "_reload_all_scripts" not in class_body:
-              additions.append("    void _reload_all_scripts() override {}")
-          if "_handles_global_class_type" not in class_body:
-              additions.append("    bool _handles_global_class_type(const String &type) const override { return false; }")
+          source_cpp = Path("src/language/chinese_language.cpp")
+          if not header.exists() or not source_cpp.exists():
+              raise SystemExit("Missing ChineseLanguage header or source")
 
+          h = header.read_text(encoding="utf-8")
+          include = "#include <godot_cpp/core/gdvirtual.gen.inc>"
+          if include not in h:
+              lines = h.splitlines()
+              insert_at = 1 if lines and lines[0].startswith("#pragma once") else 0
+              lines.insert(insert_at, include)
+              h = "\n".join(lines) + "\n"
+
+          # Remove the incorrect C++ override / inline binding patch from earlier builds, if present.
+          h = re.sub(r"^\s*void _reload_all_scripts\(\) override \{\}\s*\n", "", h, flags=re.M)
+          h = re.sub(r"^\s*bool _handles_global_class_type\(const String &type\) const override \{ return false; \}\s*\n", "", h, flags=re.M)
+          h = re.sub(
+              r"^\s*static void _bind_methods\(\)\s*\{\s*GDVIRTUAL_BIND\(_reload_all_scripts\);\s*GDVIRTUAL_BIND\(_handles_global_class_type, \"type\"\);\s*\}\s*\n",
+              "",
+              h,
+              flags=re.M,
+          )
+
+          declarations = [
+              "    GDVIRTUAL0(_reload_all_scripts);",
+              "    GDVIRTUAL1RC(bool, _handles_global_class_type, const String &);",
+          ]
+          for declaration in declarations:
+              if declaration.strip() not in h:
+                  pos = h.rfind("};")
+                  if pos < 0:
+                      raise SystemExit("Could not find end of ChineseLanguage class")
+                  h = h[:pos] + "\n" + declaration + "\n" + h[pos:]
+
+          cpp = source_cpp.read_text(encoding="utf-8")
           bind_reload = "GDVIRTUAL_BIND(_reload_all_scripts);"
-          bind_global_type = 'GDVIRTUAL_BIND(_handles_global_class_type, "type");'
-          bind_lines = []
-          if bind_reload not in class_body:
-              bind_lines.append(bind_reload)
-          if bind_global_type not in class_body:
-              bind_lines.append(bind_global_type)
+          bind_type = 'GDVIRTUAL_BIND(_handles_global_class_type, "type");'
+          match = re.search(r"void\s+ChineseLanguage::_bind_methods\s*\(\s*\)\s*\{", cpp)
+          if not match:
+              raise SystemExit("Could not find ChineseLanguage::_bind_methods() in source")
+          brace = cpp.find("{", match.start()) + 1
+          insertions = []
+          if bind_reload not in cpp:
+              insertions.append("    " + bind_reload)
+          if bind_type not in cpp:
+              insertions.append("    " + bind_type)
+          if insertions:
+              cpp = cpp[:brace] + "\n" + "\n".join(insertions) + cpp[brace:]
 
-          bind_block = (
-              "    static void _bind_methods() {\n"
-              + "".join("        " + line + "\n" for line in bind_lines)
-              + "    }"
-          )
-
-          # Register these virtual callbacks with Godot's GDExtension resolver.
-          bind_decl = re.search(r"static\s+void\s+_bind_methods\s*\(\s*\)\s*;", class_body)
-          bind_def = re.search(r"static\s+void\s+_bind_methods\s*\(\s*\)\s*\{", class_body)
-          if bind_decl and bind_lines:
-              a, b = bind_decl.span()
-              class_body = class_body[:a] + bind_block + class_body[b:]
-              changed = True
-          elif bind_def and bind_lines:
-              open_brace = class_body.find("{", bind_def.start())
-              class_body = class_body[:open_brace + 1] + (
-                  "\n" + "".join("        " + line + "\n" for line in bind_lines)
-              ) + class_body[open_brace + 1:]
-              changed = True
-          elif not bind_decl and not bind_def and bind_lines:
-              additions.append(bind_block)
-
-          if additions:
-              class_body = "\npublic:\n" + "\n".join(additions) + "\n" + class_body
-              changed = True
-
-          if changed:
-              source = source[:class_start] + class_body + source[i - 1:]
-              header.write_text(source, encoding="utf-8", newline="\n")
-              print("Added and registered required ScriptLanguageExtension virtuals")
-          else:
-              print("Required ScriptLanguageExtension virtuals already present")
+          header.write_text(h, encoding="utf-8", newline="\n")
+          source_cpp.write_text(cpp, encoding="utf-8", newline="\n")
+          print("Registered required virtual callbacks with GDVIRTUAL declarations and bindings")
           PY
 
       - name: Fetch latest godot-cpp (master)
