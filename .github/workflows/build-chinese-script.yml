@@ -55,9 +55,9 @@ jobs:
           files = [p for root in roots if root.exists() for p in root.rglob("*script_language_extension*.cpp")]
           if not files:
               raise SystemExit("Could not find generated ScriptLanguageExtension C++ binding")
-          text = "\\n".join(p.read_text(encoding="utf-8") for p in files)
+          text = "\n".join(p.read_text(encoding="utf-8") for p in files)
           def get_hash(method):
-              pattern = rf"BIND_VIRTUAL_METHOD\\(ScriptLanguageExtension,\\s*{re.escape(method)},\\s*(0x[0-9A-Fa-f]+|[0-9]+)\\s*\\)"
+              pattern = rf"BIND_VIRTUAL_METHOD\(ScriptLanguageExtension,\s*{re.escape(method)},\s*(0x[0-9A-Fa-f]+|[0-9]+)\s*\)"
               match = re.search(pattern, text)
               if not match:
                   raise SystemExit(f"Could not find Godot API hash for {method}")
@@ -69,7 +69,7 @@ jobs:
           cpp = cpp.replace("__HASH_TYPE__", get_hash("_handles_global_class_type"))
           if "__HASH_" in cpp:
               raise SystemExit("Unresolved virtual method hash placeholder")
-          source.write_text(cpp, encoding="utf-8", newline="\\n")
+          source.write_text(cpp, encoding="utf-8", newline="\n")
           print("Resolved native virtual method hashes from godot-cpp generated bindings")
           PY
 
@@ -353,9 +353,9 @@ jobs:
           files = [p for root in roots if root.exists() for p in root.rglob("*script_language_extension*.cpp")]
           if not files:
               raise SystemExit("Could not find generated ScriptLanguageExtension C++ binding")
-          text = "\\n".join(p.read_text(encoding="utf-8") for p in files)
+          text = "\n".join(p.read_text(encoding="utf-8") for p in files)
           def get_hash(method):
-              pattern = rf"BIND_VIRTUAL_METHOD\\(ScriptLanguageExtension,\\s*{re.escape(method)},\\s*(0x[0-9A-Fa-f]+|[0-9]+)\\s*\\)"
+              pattern = rf"BIND_VIRTUAL_METHOD\(ScriptLanguageExtension,\s*{re.escape(method)},\s*(0x[0-9A-Fa-f]+|[0-9]+)\s*\)"
               match = re.search(pattern, text)
               if not match:
                   raise SystemExit(f"Could not find Godot API hash for {method}")
@@ -367,7 +367,7 @@ jobs:
           cpp = cpp.replace("__HASH_TYPE__", get_hash("_handles_global_class_type"))
           if "__HASH_" in cpp:
               raise SystemExit("Unresolved virtual method hash placeholder")
-          source.write_text(cpp, encoding="utf-8", newline="\\n")
+          source.write_text(cpp, encoding="utf-8", newline="\n")
           print("Resolved native virtual method hashes from godot-cpp generated bindings")
           PY
 
