@@ -72,7 +72,7 @@ jobs:
               raise SystemExit(f"Missing language header: {header}")
           source = header.read_text(encoding="utf-8")
           class_pattern = re.compile(
-              r"(class\s+ChineseLanguage\s*:\s*public\s+(?:godot::)?ScriptLanguageExtension\s*\\{)"
+              r"(class\s+ChineseLanguage\s*:\s*public\s+(?:godot::)?ScriptLanguageExtension\s*\{)"
           )
           match = class_pattern.search(source)
           if not match:
@@ -201,7 +201,7 @@ jobs:
               raise SystemExit(f"Missing language header: {header}")
           source = header.read_text(encoding="utf-8")
           class_pattern = re.compile(
-              r"(class\s+ChineseLanguage\s*:\s*public\s+(?:godot::)?ScriptLanguageExtension\s*\\{)"
+              r"(class\s+ChineseLanguage\s*:\s*public\s+(?:godot::)?ScriptLanguageExtension\s*\{)"
           )
           match = class_pattern.search(source)
           if not match:
