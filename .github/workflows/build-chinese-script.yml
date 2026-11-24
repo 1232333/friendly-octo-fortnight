@@ -96,6 +96,8 @@ jobs:
           declarations = [
               "    GDVIRTUAL0(_reload_all_scripts);",
               "    GDVIRTUAL1RC(bool, _handles_global_class_type, const String &);",
+              "    void _reload_all_scripts();",
+              "    bool _handles_global_class_type(const String &type) const;",
           ]
           for declaration in declarations:
               if declaration.strip() not in h:
@@ -105,11 +107,16 @@ jobs:
                   h = h[:pos] + "\n" + declaration + "\n" + h[pos:]
 
           cpp = source_cpp.read_text(encoding="utf-8")
-          bind_reload = "GDVIRTUAL_BIND(_reload_all_scripts);"
-          bind_type = 'GDVIRTUAL_BIND(_handles_global_class_type, "type");'
+          bind_reload = "BIND_VIRTUAL_METHOD(ChineseLanguage, _reload_all_scripts, _gdvirtual__reload_all_scripts_get_method_info().get_compatibility_hash());"
+          bind_type = "BIND_VIRTUAL_METHOD(ChineseLanguage, _handles_global_class_type, _gdvirtual__handles_global_class_type_get_method_info().get_compatibility_hash());"
           match = re.search(r"void\s+ChineseLanguage::_bind_methods\s*\(\s*\)\s*\{", cpp)
           if not match:
               raise SystemExit("Could not find ChineseLanguage::_bind_methods() in source")
+          brace = cpp.find("{", match.start()) + 1
+          # Remove the earlier GDVIRTUAL_BIND-only registrations: they declare metadata,
+          # but do not install the native GDExtension callback implementation.
+          cpp = re.sub(r"^\s*GDVIRTUAL_BIND\([^\n]*\);\s*\n", "", cpp, flags=re.M)
+          match = re.search(r"void\s+ChineseLanguage::_bind_methods\s*\(\s*\)\s*\{", cpp)
           brace = cpp.find("{", match.start()) + 1
           insertions = []
           if bind_reload not in cpp:
@@ -119,9 +126,14 @@ jobs:
           if insertions:
               cpp = cpp[:brace] + "\n" + "\n".join(insertions) + cpp[brace:]
 
+          if "void ChineseLanguage::_reload_all_scripts()" not in cpp:
+              cpp += "\n\nvoid ChineseLanguage::_reload_all_scripts() {\n}\n"
+          if "bool ChineseLanguage::_handles_global_class_type(" not in cpp:
+              cpp += "\n\nbool ChineseLanguage::_handles_global_class_type(const String &type) const {\n    return false;\n}\n"
+
           header.write_text(h, encoding="utf-8", newline="\n")
           source_cpp.write_text(cpp, encoding="utf-8", newline="\n")
-          print("Registered required virtual callbacks with GDVIRTUAL declarations and bindings")
+          print("Registered native ScriptLanguageExtension virtual callbacks with BIND_VIRTUAL_METHOD")
           PY
 
       - name: Fetch latest godot-cpp (master)
@@ -251,6 +263,8 @@ jobs:
           declarations = [
               "    GDVIRTUAL0(_reload_all_scripts);",
               "    GDVIRTUAL1RC(bool, _handles_global_class_type, const String &);",
+              "    void _reload_all_scripts();",
+              "    bool _handles_global_class_type(const String &type) const;",
           ]
           for declaration in declarations:
               if declaration.strip() not in h:
@@ -260,11 +274,16 @@ jobs:
                   h = h[:pos] + "\n" + declaration + "\n" + h[pos:]
 
           cpp = source_cpp.read_text(encoding="utf-8")
-          bind_reload = "GDVIRTUAL_BIND(_reload_all_scripts);"
-          bind_type = 'GDVIRTUAL_BIND(_handles_global_class_type, "type");'
+          bind_reload = "BIND_VIRTUAL_METHOD(ChineseLanguage, _reload_all_scripts, _gdvirtual__reload_all_scripts_get_method_info().get_compatibility_hash());"
+          bind_type = "BIND_VIRTUAL_METHOD(ChineseLanguage, _handles_global_class_type, _gdvirtual__handles_global_class_type_get_method_info().get_compatibility_hash());"
           match = re.search(r"void\s+ChineseLanguage::_bind_methods\s*\(\s*\)\s*\{", cpp)
           if not match:
               raise SystemExit("Could not find ChineseLanguage::_bind_methods() in source")
+          brace = cpp.find("{", match.start()) + 1
+          # Remove the earlier GDVIRTUAL_BIND-only registrations: they declare metadata,
+          # but do not install the native GDExtension callback implementation.
+          cpp = re.sub(r"^\s*GDVIRTUAL_BIND\([^\n]*\);\s*\n", "", cpp, flags=re.M)
+          match = re.search(r"void\s+ChineseLanguage::_bind_methods\s*\(\s*\)\s*\{", cpp)
           brace = cpp.find("{", match.start()) + 1
           insertions = []
           if bind_reload not in cpp:
@@ -274,9 +293,14 @@ jobs:
           if insertions:
               cpp = cpp[:brace] + "\n" + "\n".join(insertions) + cpp[brace:]
 
+          if "void ChineseLanguage::_reload_all_scripts()" not in cpp:
+              cpp += "\n\nvoid ChineseLanguage::_reload_all_scripts() {\n}\n"
+          if "bool ChineseLanguage::_handles_global_class_type(" not in cpp:
+              cpp += "\n\nbool ChineseLanguage::_handles_global_class_type(const String &type) const {\n    return false;\n}\n"
+
           header.write_text(h, encoding="utf-8", newline="\n")
           source_cpp.write_text(cpp, encoding="utf-8", newline="\n")
-          print("Registered required virtual callbacks with GDVIRTUAL declarations and bindings")
+          print("Registered native ScriptLanguageExtension virtual callbacks with BIND_VIRTUAL_METHOD")
           PY
 
       - name: Fetch latest godot-cpp (master)
