@@ -80,15 +80,18 @@ jobs:
               lines.insert(insert_at, include)
               h = "\n".join(lines) + "\n"
 
-          # Remove the incorrect C++ override / inline binding patch from earlier builds, if present.
-          h = re.sub(r"^\s*void _reload_all_scripts\(\) override \{\}\s*\n", "", h, flags=re.M)
-          h = re.sub(r"^\s*bool _handles_global_class_type\(const String &type\) const override \{ return false; \}\s*\n", "", h, flags=re.M)
+          # Remove all previous binding statements from the class header.
+          # GDVIRTUAL_BIND belongs in the out-of-line _bind_methods() implementation,
+          # never directly in the class declaration.
+          h = re.sub(r"^\s*GDVIRTUAL_BIND\([^\n]*\);\s*\n", "", h, flags=re.M)
           h = re.sub(
-              r"^\s*static void _bind_methods\(\)\s*\{\s*GDVIRTUAL_BIND\(_reload_all_scripts\);\s*GDVIRTUAL_BIND\(_handles_global_class_type, \"type\"\);\s*\}\s*\n",
+              r"static\s+void\s+_bind_methods\s*\(\s*\)\s*\{[^}]*\}",
               "",
               h,
-              flags=re.M,
+              flags=re.S,
           )
+          h = re.sub(r"^\s*void _reload_all_scripts\(\) override \{\}\s*\n", "", h, flags=re.M)
+          h = re.sub(r"^\s*bool _handles_global_class_type\(const String &type\) const override \{ return false; \}\s*\n", "", h, flags=re.M)
 
           declarations = [
               "    GDVIRTUAL0(_reload_all_scripts);",
