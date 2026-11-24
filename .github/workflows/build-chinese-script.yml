@@ -59,9 +59,52 @@ jobs:
           # string.hpp only forward-declares PackedStringArray; this translation unit instantiates it.
           sed -i '1i #include <godot_cpp/variant/packed_string_array.hpp>' src/frontend/m1_parser.cpp
 
-      - name: Fetch godot-cpp 4.4
+      - name: Implement required Godot 4.7 script-language virtual
         working-directory: ${{ steps.project.outputs.dir }}
-        run: git clone --depth 1 --branch 4.4 https://github.com/godotengine/godot-cpp.git godot-cpp
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          header = Path("src/language/chinese_language.h")
+          if not header.exists():
+              raise SystemExit(f"Missing language header: {header}")
+          source = header.read_text(encoding="utf-8")
+          class_pattern = re.compile(
+              r"(class\\s+ChineseLanguage\\s*:\\s*public\\s+(?:godot::)?ScriptLanguageExtension\\s*\\{)"
+          )
+          match = class_pattern.search(source)
+          if not match:
+              raise SystemExit("Could not locate ChineseLanguage : public ScriptLanguageExtension")
+          class_start = match.end()
+          depth = 1
+          i = class_start
+          while i < len(source) and depth:
+              if source[i] == "{":
+                  depth += 1
+              elif source[i] == "}":
+                  depth -= 1
+              i += 1
+          if depth:
+              raise SystemExit("Unbalanced ChineseLanguage class braces")
+          class_body = source[class_start:i - 1]
+          if "_reload_all_scripts" not in class_body:
+              source = (
+                  source[:class_start]
+                  + "\\npublic:\\n    // M1 has no hot-reload implementation yet; provide the required Godot virtual.\\n"
+                  + "    void _reload_all_scripts() override {}\\n"
+                  + source[class_start:]
+              )
+              header.write_text(source, encoding="utf-8", newline="\\n")
+              print("Added ChineseLanguage::_reload_all_scripts() override")
+          else:
+              print("ChineseLanguage already overrides _reload_all_scripts()")
+          PY
+
+      - name: Fetch godot-cpp 4.7
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: git clone --depth 1 --branch 4.7 https://github.com/godotengine/godot-cpp.git godot-cpp
 
       - name: Configure
         working-directory: ${{ steps.project.outputs.dir }}
@@ -145,9 +188,52 @@ jobs:
           sdkmanager --install "ndk;27.2.12479018"
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
-      - name: Fetch godot-cpp 4.4
+      - name: Implement required Godot 4.7 script-language virtual
         working-directory: ${{ steps.project.outputs.dir }}
-        run: git clone --depth 1 --branch 4.4 https://github.com/godotengine/godot-cpp.git godot-cpp
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          header = Path("src/language/chinese_language.h")
+          if not header.exists():
+              raise SystemExit(f"Missing language header: {header}")
+          source = header.read_text(encoding="utf-8")
+          class_pattern = re.compile(
+              r"(class\\s+ChineseLanguage\\s*:\\s*public\\s+(?:godot::)?ScriptLanguageExtension\\s*\\{)"
+          )
+          match = class_pattern.search(source)
+          if not match:
+              raise SystemExit("Could not locate ChineseLanguage : public ScriptLanguageExtension")
+          class_start = match.end()
+          depth = 1
+          i = class_start
+          while i < len(source) and depth:
+              if source[i] == "{":
+                  depth += 1
+              elif source[i] == "}":
+                  depth -= 1
+              i += 1
+          if depth:
+              raise SystemExit("Unbalanced ChineseLanguage class braces")
+          class_body = source[class_start:i - 1]
+          if "_reload_all_scripts" not in class_body:
+              source = (
+                  source[:class_start]
+                  + "\\npublic:\\n    // M1 has no hot-reload implementation yet; provide the required Godot virtual.\\n"
+                  + "    void _reload_all_scripts() override {}\\n"
+                  + source[class_start:]
+              )
+              header.write_text(source, encoding="utf-8", newline="\\n")
+              print("Added ChineseLanguage::_reload_all_scripts() override")
+          else:
+              print("ChineseLanguage already overrides _reload_all_scripts()")
+          PY
+
+      - name: Fetch godot-cpp 4.7
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: git clone --depth 1 --branch 4.7 https://github.com/godotengine/godot-cpp.git godot-cpp
 
       - name: Fix Godot 4.4 typed array signatures
         working-directory: ${{ steps.project.outputs.dir }}
