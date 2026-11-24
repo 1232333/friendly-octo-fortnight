@@ -90,6 +90,7 @@ jobs:
               raise SystemExit("Unbalanced ChineseLanguage class braces")
           class_body = source[class_start:i - 1]
           additions = []
+          changed = False
           if "_reload_all_scripts" not in class_body:
               additions.append("    void _reload_all_scripts() override {}")
           if "_handles_global_class_type" not in class_body:
@@ -97,33 +98,41 @@ jobs:
 
           bind_reload = "GDVIRTUAL_BIND(_reload_all_scripts);"
           bind_global_type = 'GDVIRTUAL_BIND(_handles_global_class_type, "type");'
+          bind_lines = []
+          if bind_reload not in class_body:
+              bind_lines.append(bind_reload)
+          if bind_global_type not in class_body:
+              bind_lines.append(bind_global_type)
+
           bind_block = (
               "    static void _bind_methods() {\n"
-              f"        {bind_reload}\n"
-              f"        {bind_global_type}\n"
-              "    }"
+              + "".join("        " + line + "\n" for line in bind_lines)
+              + "    }"
           )
 
-          # Register the two ScriptLanguageExtension virtuals with Godot's
-          # GDExtension virtual-method resolver; plain C++ overrides alone
-          # do not register these callbacks.
-          bind_decl = re.search(r"static\\s+void\\s+_bind_methods\\s*\\(\\s*\\)\\s*;", class_body)
-          bind_def = re.search(r"static\\s+void\\s+_bind_methods\\s*\\(\\s*\\)\\s*\\{", class_body)
-          if bind_decl:
+          # Register these virtual callbacks with Godot's GDExtension resolver.
+          bind_decl = re.search(r"static\s+void\s+_bind_methods\s*\(\s*\)\s*;", class_body)
+          bind_def = re.search(r"static\s+void\s+_bind_methods\s*\(\s*\)\s*\{", class_body)
+          if bind_decl and bind_lines:
               a, b = bind_decl.span()
               class_body = class_body[:a] + bind_block + class_body[b:]
-          elif bind_def:
+              changed = True
+          elif bind_def and bind_lines:
               open_brace = class_body.find("{", bind_def.start())
               class_body = class_body[:open_brace + 1] + (
-                  "\\n        " + bind_reload + "\\n        " + bind_global_type + "\\n"
+                  "\n" + "".join("        " + line + "\n" for line in bind_lines)
               ) + class_body[open_brace + 1:]
-          elif "GDVIRTUAL_BIND(_reload_all_scripts)" not in class_body:
+              changed = True
+          elif not bind_decl and not bind_def and bind_lines:
               additions.append(bind_block)
 
           if additions:
-              prefix = "\\npublic:\\n" + "\\n".join(additions) + "\\n"
-              source = source[:class_start] + prefix + class_body + source[i - 1:]
-              header.write_text(source, encoding="utf-8", newline="\\n")
+              class_body = "\npublic:\n" + "\n".join(additions) + "\n" + class_body
+              changed = True
+
+          if changed:
+              source = source[:class_start] + class_body + source[i - 1:]
+              header.write_text(source, encoding="utf-8", newline="\n")
               print("Added and registered required ScriptLanguageExtension virtuals")
           else:
               print("Required ScriptLanguageExtension virtuals already present")
@@ -253,6 +262,7 @@ jobs:
               raise SystemExit("Unbalanced ChineseLanguage class braces")
           class_body = source[class_start:i - 1]
           additions = []
+          changed = False
           if "_reload_all_scripts" not in class_body:
               additions.append("    void _reload_all_scripts() override {}")
           if "_handles_global_class_type" not in class_body:
@@ -260,33 +270,41 @@ jobs:
 
           bind_reload = "GDVIRTUAL_BIND(_reload_all_scripts);"
           bind_global_type = 'GDVIRTUAL_BIND(_handles_global_class_type, "type");'
+          bind_lines = []
+          if bind_reload not in class_body:
+              bind_lines.append(bind_reload)
+          if bind_global_type not in class_body:
+              bind_lines.append(bind_global_type)
+
           bind_block = (
               "    static void _bind_methods() {\n"
-              f"        {bind_reload}\n"
-              f"        {bind_global_type}\n"
-              "    }"
+              + "".join("        " + line + "\n" for line in bind_lines)
+              + "    }"
           )
 
-          # Register the two ScriptLanguageExtension virtuals with Godot's
-          # GDExtension virtual-method resolver; plain C++ overrides alone
-          # do not register these callbacks.
-          bind_decl = re.search(r"static\\s+void\\s+_bind_methods\\s*\\(\\s*\\)\\s*;", class_body)
-          bind_def = re.search(r"static\\s+void\\s+_bind_methods\\s*\\(\\s*\\)\\s*\\{", class_body)
-          if bind_decl:
+          # Register these virtual callbacks with Godot's GDExtension resolver.
+          bind_decl = re.search(r"static\s+void\s+_bind_methods\s*\(\s*\)\s*;", class_body)
+          bind_def = re.search(r"static\s+void\s+_bind_methods\s*\(\s*\)\s*\{", class_body)
+          if bind_decl and bind_lines:
               a, b = bind_decl.span()
               class_body = class_body[:a] + bind_block + class_body[b:]
-          elif bind_def:
+              changed = True
+          elif bind_def and bind_lines:
               open_brace = class_body.find("{", bind_def.start())
               class_body = class_body[:open_brace + 1] + (
-                  "\\n        " + bind_reload + "\\n        " + bind_global_type + "\\n"
+                  "\n" + "".join("        " + line + "\n" for line in bind_lines)
               ) + class_body[open_brace + 1:]
-          elif "GDVIRTUAL_BIND(_reload_all_scripts)" not in class_body:
+              changed = True
+          elif not bind_decl and not bind_def and bind_lines:
               additions.append(bind_block)
 
           if additions:
-              prefix = "\\npublic:\\n" + "\\n".join(additions) + "\\n"
-              source = source[:class_start] + prefix + class_body + source[i - 1:]
-              header.write_text(source, encoding="utf-8", newline="\\n")
+              class_body = "\npublic:\n" + "\n".join(additions) + "\n" + class_body
+              changed = True
+
+          if changed:
+              source = source[:class_start] + class_body + source[i - 1:]
+              header.write_text(source, encoding="utf-8", newline="\n")
               print("Added and registered required ScriptLanguageExtension virtuals")
           else:
               print("Required ScriptLanguageExtension virtuals already present")
