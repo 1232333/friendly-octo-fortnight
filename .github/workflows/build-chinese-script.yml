@@ -187,7 +187,6 @@ jobs:
           s = p.read_text(encoding="utf-8")
           entries = (
               'android.debug.arm64 = "res://addons/chinese_script_language/bin/libchinese_script.so"',
-              'android.release.arm64 = "res://addons/chinese_script_language/bin/libchinese_script.so"',
           )
           if "[libraries]" not in s:
               raise SystemExit("GDExtension manifest has no [libraries] section")
