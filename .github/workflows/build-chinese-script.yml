@@ -163,7 +163,7 @@ jobs:
 
           import json
 
-          api_path = Path("godot-cpp/gdextension/extension_api.json")
+          api_path = Path("godot-cpp/gdextension/extension_api-4-7.json")
           if not api_path.exists():
               raise SystemExit(f"Missing Godot extension API file: {api_path}")
           api = json.loads(api_path.read_text(encoding="utf-8"))
@@ -391,7 +391,7 @@ jobs:
 
           import json
 
-          api_path = Path("godot-cpp/gdextension/extension_api.json")
+          api_path = Path("godot-cpp/gdextension/extension_api-4-7.json")
           if not api_path.exists():
               raise SystemExit(f"Missing Godot extension API file: {api_path}")
           api = json.loads(api_path.read_text(encoding="utf-8"))
