@@ -161,17 +161,21 @@ jobs:
           from pathlib import Path
           import re
 
-          roots = [Path("godot-cpp/gen/src/classes"), Path("godot-cpp/src/classes")]
-          files = [p for root in roots if root.exists() for p in root.rglob("*script_language_extension*.cpp")]
-          if not files:
-              raise SystemExit("Could not find generated ScriptLanguageExtension C++ binding")
-          text = "\n".join(p.read_text(encoding="utf-8") for p in files)
+          import json
+
+          api_path = Path("godot-cpp/gdextension/extension_api.json")
+          if not api_path.exists():
+              raise SystemExit(f"Missing Godot extension API file: {api_path}")
+          api = json.loads(api_path.read_text(encoding="utf-8"))
+          script_language = next((c for c in api.get("classes", []) if c.get("name") == "ScriptLanguageExtension"), None)
+          if script_language is None:
+              raise SystemExit("ScriptLanguageExtension missing from extension_api.json")
+
           def get_hash(method):
-              pattern = rf"BIND_VIRTUAL_METHOD\(ScriptLanguageExtension,\s*{re.escape(method)},\s*(0x[0-9A-Fa-f]+|[0-9]+)\s*\)"
-              match = re.search(pattern, text)
-              if not match:
+              entry = next((m for m in script_language.get("methods", []) if m.get("name") == method), None)
+              if entry is None or "hash" not in entry:
                   raise SystemExit(f"Could not find Godot API hash for {method}")
-              return match.group(1)
+              return str(entry["hash"])
 
           source = Path("src/language/chinese_language.cpp")
           cpp = source.read_text(encoding="utf-8")
@@ -385,17 +389,21 @@ jobs:
           from pathlib import Path
           import re
 
-          roots = [Path("godot-cpp/gen/src/classes"), Path("godot-cpp/src/classes")]
-          files = [p for root in roots if root.exists() for p in root.rglob("*script_language_extension*.cpp")]
-          if not files:
-              raise SystemExit("Could not find generated ScriptLanguageExtension C++ binding")
-          text = "\n".join(p.read_text(encoding="utf-8") for p in files)
+          import json
+
+          api_path = Path("godot-cpp/gdextension/extension_api.json")
+          if not api_path.exists():
+              raise SystemExit(f"Missing Godot extension API file: {api_path}")
+          api = json.loads(api_path.read_text(encoding="utf-8"))
+          script_language = next((c for c in api.get("classes", []) if c.get("name") == "ScriptLanguageExtension"), None)
+          if script_language is None:
+              raise SystemExit("ScriptLanguageExtension missing from extension_api.json")
+
           def get_hash(method):
-              pattern = rf"BIND_VIRTUAL_METHOD\(ScriptLanguageExtension,\s*{re.escape(method)},\s*(0x[0-9A-Fa-f]+|[0-9]+)\s*\)"
-              match = re.search(pattern, text)
-              if not match:
+              entry = next((m for m in script_language.get("methods", []) if m.get("name") == method), None)
+              if entry is None or "hash" not in entry:
                   raise SystemExit(f"Could not find Godot API hash for {method}")
-              return match.group(1)
+              return str(entry["hash"])
 
           source = Path("src/language/chinese_language.cpp")
           cpp = source.read_text(encoding="utf-8")
