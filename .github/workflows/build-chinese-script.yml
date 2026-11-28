@@ -214,21 +214,21 @@ jobs:
                   pos = h.rfind("};")
                   if pos < 0:
                       raise SystemExit("ChineseLanguage class terminator not found")
-                  h = h[:pos] + "    " + declaration + "\\n" + h[pos:]
+                  h = h[:pos] + "    " + declaration + "\n" + h[pos:]
               native_decl = f"    {ret} {name}({args}) const;"
               if native_decl not in h:
                   pos = h.rfind("};")
-                  h = h[:pos] + native_decl + "\\n" + h[pos:]
+                  h = h[:pos] + native_decl + "\n" + h[pos:]
 
               bind = f"BIND_VIRTUAL_METHOD(ChineseLanguage, {name}, __HASH_{name}__);"
               if bind not in cpp:
-                  m = re.search(r"void\\s+ChineseLanguage::_bind_methods\\s*\\(\\s*\\)\\s*\\{", cpp)
+                  m = re.search(r"void\s+ChineseLanguage::_bind_methods\s*\(\s*\)\s*\{", cpp)
                   if not m:
                       raise SystemExit("ChineseLanguage::_bind_methods() not found")
                   pos = cpp.find("{", m.start()) + 1
-                  cpp = cpp[:pos] + "\\n    " + bind + cpp[pos:]
+                  cpp = cpp[:pos] + "\n    " + bind + cpp[pos:]
 
-              definition = f"\\n{ret} ChineseLanguage::{name}({args}) const {{ {body} }}\\n"
+              definition = f"\n{ret} ChineseLanguage::{name}({args}) const {{ {body} }}\n"
               signature = f"{ret} ChineseLanguage::{name}("
               if signature not in cpp:
                   pos = cpp.rfind("} // namespace godot")
@@ -244,8 +244,8 @@ jobs:
 
           if "__HASH_" in cpp:
               raise SystemExit("Unresolved virtual method hash placeholder")
-          header.write_text(h, encoding="utf-8", newline="\\n")
-          source.write_text(cpp, encoding="utf-8", newline="\\n")
+          header.write_text(h, encoding="utf-8", newline="\n")
+          source.write_text(cpp, encoding="utf-8", newline="\n")
           print("Registered _can_inherit_from_file, _supports_builtin_mode and _validate_path")
           PY
 
@@ -504,21 +504,21 @@ jobs:
                   pos = h.rfind("};")
                   if pos < 0:
                       raise SystemExit("ChineseLanguage class terminator not found")
-                  h = h[:pos] + "    " + declaration + "\\n" + h[pos:]
+                  h = h[:pos] + "    " + declaration + "\n" + h[pos:]
               native_decl = f"    {ret} {name}({args}) const;"
               if native_decl not in h:
                   pos = h.rfind("};")
-                  h = h[:pos] + native_decl + "\\n" + h[pos:]
+                  h = h[:pos] + native_decl + "\n" + h[pos:]
 
               bind = f"BIND_VIRTUAL_METHOD(ChineseLanguage, {name}, __HASH_{name}__);"
               if bind not in cpp:
-                  m = re.search(r"void\\s+ChineseLanguage::_bind_methods\\s*\\(\\s*\\)\\s*\\{", cpp)
+                  m = re.search(r"void\s+ChineseLanguage::_bind_methods\s*\(\s*\)\s*\{", cpp)
                   if not m:
                       raise SystemExit("ChineseLanguage::_bind_methods() not found")
                   pos = cpp.find("{", m.start()) + 1
-                  cpp = cpp[:pos] + "\\n    " + bind + cpp[pos:]
+                  cpp = cpp[:pos] + "\n    " + bind + cpp[pos:]
 
-              definition = f"\\n{ret} ChineseLanguage::{name}({args}) const {{ {body} }}\\n"
+              definition = f"\n{ret} ChineseLanguage::{name}({args}) const {{ {body} }}\n"
               signature = f"{ret} ChineseLanguage::{name}("
               if signature not in cpp:
                   pos = cpp.rfind("} // namespace godot")
@@ -534,8 +534,8 @@ jobs:
 
           if "__HASH_" in cpp:
               raise SystemExit("Unresolved virtual method hash placeholder")
-          header.write_text(h, encoding="utf-8", newline="\\n")
-          source.write_text(cpp, encoding="utf-8", newline="\\n")
+          header.write_text(h, encoding="utf-8", newline="\n")
+          source.write_text(cpp, encoding="utf-8", newline="\n")
           print("Registered _can_inherit_from_file, _supports_builtin_mode and _validate_path")
           PY
 
