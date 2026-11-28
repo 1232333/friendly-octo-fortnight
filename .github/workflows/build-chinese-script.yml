@@ -187,6 +187,68 @@ jobs:
           print("Resolved native virtual method hashes from godot-cpp generated bindings")
           PY
 
+      - name: Register remaining ScriptLanguageExtension virtuals
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, re
+
+          header = Path("src/language/chinese_language.h")
+          source = Path("src/language/chinese_language.cpp")
+          api_path = Path("godot-cpp/gdextension/extension_api-4-7.json")
+          h = header.read_text(encoding="utf-8")
+          cpp = source.read_text(encoding="utf-8")
+          api = json.loads(api_path.read_text(encoding="utf-8"))
+          cls = next(x for x in api["classes"] if x["name"] == "ScriptLanguageExtension")
+
+          methods = [
+              ("_can_inherit_from_file", "GDVIRTUAL0RC(bool, _can_inherit_from_file);", "bool", "", "return false;"),
+              ("_supports_builtin_mode", "GDVIRTUAL0RC(bool, _supports_builtin_mode);", "bool", "", "return false;"),
+              ("_validate_path", "GDVIRTUAL1RC(String, _validate_path, const String &);", "String", "const String &path", "return path;"),
+          ]
+
+          for name, declaration, ret, args, body in methods:
+              if declaration not in h:
+                  pos = h.rfind("};")
+                  if pos < 0:
+                      raise SystemExit("ChineseLanguage class terminator not found")
+                  h = h[:pos] + "    " + declaration + "\\n" + h[pos:]
+              native_decl = f"    {ret} {name}({args}) const;"
+              if native_decl not in h:
+                  pos = h.rfind("};")
+                  h = h[:pos] + native_decl + "\\n" + h[pos:]
+
+              bind = f"BIND_VIRTUAL_METHOD(ChineseLanguage, {name}, __HASH_{name}__);"
+              if bind not in cpp:
+                  m = re.search(r"void\\s+ChineseLanguage::_bind_methods\\s*\\(\\s*\\)\\s*\\{", cpp)
+                  if not m:
+                      raise SystemExit("ChineseLanguage::_bind_methods() not found")
+                  pos = cpp.find("{", m.start()) + 1
+                  cpp = cpp[:pos] + "\\n    " + bind + cpp[pos:]
+
+              definition = f"\\n{ret} ChineseLanguage::{name}({args}) const {{ {body} }}\\n"
+              signature = f"{ret} ChineseLanguage::{name}("
+              if signature not in cpp:
+                  pos = cpp.rfind("} // namespace godot")
+                  if pos < 0:
+                      raise SystemExit("godot namespace terminator not found")
+                  cpp = cpp[:pos] + definition + cpp[pos:]
+
+          for name, *_ in methods:
+              entry = next((m for m in cls.get("methods", []) if m["name"] == name), None)
+              if not entry or "hash" not in entry:
+                  raise SystemExit(f"Godot 4.7 API hash missing: {name}")
+              cpp = cpp.replace(f"__HASH_{name}__", str(entry["hash"]))
+
+          if "__HASH_" in cpp:
+              raise SystemExit("Unresolved virtual method hash placeholder")
+          header.write_text(h, encoding="utf-8", newline="\\n")
+          source.write_text(cpp, encoding="utf-8", newline="\\n")
+          print("Registered _can_inherit_from_file, _supports_builtin_mode and _validate_path")
+          PY
+
       - name: Compile
         working-directory: ${{ steps.project.outputs.dir }}
         run: set -o pipefail && cmake --build build --parallel 2>&1 | tee build.log
@@ -413,6 +475,68 @@ jobs:
               raise SystemExit("Unresolved virtual method hash placeholder")
           source.write_text(cpp, encoding="utf-8", newline="\n")
           print("Resolved native virtual method hashes from godot-cpp generated bindings")
+          PY
+
+      - name: Register remaining ScriptLanguageExtension virtuals
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, re
+
+          header = Path("src/language/chinese_language.h")
+          source = Path("src/language/chinese_language.cpp")
+          api_path = Path("godot-cpp/gdextension/extension_api-4-7.json")
+          h = header.read_text(encoding="utf-8")
+          cpp = source.read_text(encoding="utf-8")
+          api = json.loads(api_path.read_text(encoding="utf-8"))
+          cls = next(x for x in api["classes"] if x["name"] == "ScriptLanguageExtension")
+
+          methods = [
+              ("_can_inherit_from_file", "GDVIRTUAL0RC(bool, _can_inherit_from_file);", "bool", "", "return false;"),
+              ("_supports_builtin_mode", "GDVIRTUAL0RC(bool, _supports_builtin_mode);", "bool", "", "return false;"),
+              ("_validate_path", "GDVIRTUAL1RC(String, _validate_path, const String &);", "String", "const String &path", "return path;"),
+          ]
+
+          for name, declaration, ret, args, body in methods:
+              if declaration not in h:
+                  pos = h.rfind("};")
+                  if pos < 0:
+                      raise SystemExit("ChineseLanguage class terminator not found")
+                  h = h[:pos] + "    " + declaration + "\\n" + h[pos:]
+              native_decl = f"    {ret} {name}({args}) const;"
+              if native_decl not in h:
+                  pos = h.rfind("};")
+                  h = h[:pos] + native_decl + "\\n" + h[pos:]
+
+              bind = f"BIND_VIRTUAL_METHOD(ChineseLanguage, {name}, __HASH_{name}__);"
+              if bind not in cpp:
+                  m = re.search(r"void\\s+ChineseLanguage::_bind_methods\\s*\\(\\s*\\)\\s*\\{", cpp)
+                  if not m:
+                      raise SystemExit("ChineseLanguage::_bind_methods() not found")
+                  pos = cpp.find("{", m.start()) + 1
+                  cpp = cpp[:pos] + "\\n    " + bind + cpp[pos:]
+
+              definition = f"\\n{ret} ChineseLanguage::{name}({args}) const {{ {body} }}\\n"
+              signature = f"{ret} ChineseLanguage::{name}("
+              if signature not in cpp:
+                  pos = cpp.rfind("} // namespace godot")
+                  if pos < 0:
+                      raise SystemExit("godot namespace terminator not found")
+                  cpp = cpp[:pos] + definition + cpp[pos:]
+
+          for name, *_ in methods:
+              entry = next((m for m in cls.get("methods", []) if m["name"] == name), None)
+              if not entry or "hash" not in entry:
+                  raise SystemExit(f"Godot 4.7 API hash missing: {name}")
+              cpp = cpp.replace(f"__HASH_{name}__", str(entry["hash"]))
+
+          if "__HASH_" in cpp:
+              raise SystemExit("Unresolved virtual method hash placeholder")
+          header.write_text(h, encoding="utf-8", newline="\\n")
+          source.write_text(cpp, encoding="utf-8", newline="\\n")
+          print("Registered _can_inherit_from_file, _supports_builtin_mode and _validate_path")
           PY
 
       - name: Compile Android ARM64
